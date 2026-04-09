@@ -1,0 +1,120 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <nav class="px-5 py-3 flex items-center gap-3 border-b border-base-300 shrink-0 flex-wrap">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors shrink-0">
+      <span class="text-base font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/20 shrink-0">›</span>
+    <span class="text-sm text-base-content/45 truncate">Via Istanbul vs via Dubai</span>
+  </nav>
+
+  <div class="flex-1">
+    <div class="max-w-2xl mx-auto px-5 py-10 sm:py-14">
+
+      <div class="mb-10">
+        <h1 class="text-2xl sm:text-3xl font-bold text-base-content tracking-tight mb-3">
+          Via Istanbul vs via Dubai: what the difference means now
+        </h1>
+        <p class="text-base-content/55 text-sm leading-relaxed max-w-lg">
+          Istanbul and Dubai are the two most common one-stop hubs for Europe-to-Asia connections. Before 2022, the choice was mostly about schedule and preference. Since then, these two corridors have a structural difference that matters: what happens on the first leg.
+        </p>
+      </div>
+
+      <div class="space-y-10">
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">The core difference</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              The distinction is not about the hub itself or the second leg — it is about the inbound leg from Europe. A flight from London or Frankfurt to Istanbul stays largely west of the active advisory zone. Turkish airspace is not within the EASA-flagged region. A flight from the same origin to Dubai routes south through the Middle East, crossing airspace that falls within active EASA advisories.
+            </p>
+            <p>
+              The hub-to-Asia leg — Istanbul to Bangkok, Dubai to Singapore, and so on — is generally clean for both corridors. The meaningful airspace difference is concentrated on the first leg.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Why Istanbul has the airspace advantage</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              Istanbul sits at the geographic crossroads of Europe and Asia such that a London–Istanbul flight routes east without needing to transit the Gulf advisory zone. The airspace between Western Europe and Turkey is clean relative to current advisories — no EASA conflict zone warnings apply to the European-to-IST segment.
+            </p>
+            <p>
+              This means the Istanbul corridor avoids the advisory zone on both legs for most European departures. FlightDetour assigns it a lower airspace exposure score as a result, which flows through to a higher composite score — more structural stability, lower advisory zone risk.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">When Dubai still makes sense</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              Lower airspace score does not mean the Dubai corridor is a bad option. Emirates operates the highest frequency of any carrier on most Europe-to-Asia pairs — four or more daily departures from London alone, with strong onward connectivity throughout Southeast Asia and beyond. More departures means more rebooking options if disruption occurs.
+            </p>
+            <p>
+              Dubai airport (DXB) has demonstrated strong operational resilience throughout the current advisory period. If schedule flexibility, carrier product, or loyalty programme points matter most to you, the airspace exposure cost may be a reasonable tradeoff — as long as it is a deliberate one.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Which routes show this comparison most clearly</h2>
+          <p class="text-sm text-base-content/50 mb-3 leading-relaxed">
+            These pairs have both the Istanbul and Dubai corridors covered with scored comparisons, so you can see the difference directly.
+          </p>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/route/london-to-bangkok"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">London → Bangkok</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Istanbul · Dubai · Hong Kong →</span>
+            </.link>
+            <.link navigate={~p"/route/london-to-singapore"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">London → Singapore</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Compare corridors →</span>
+            </.link>
+            <.link navigate={~p"/route/frankfurt-to-bangkok"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">Frankfurt → Bangkok</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Compare corridors →</span>
+            </.link>
+            <.link navigate={~p"/route/frankfurt-to-singapore"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">Frankfurt → Singapore</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Compare corridors →</span>
+            </.link>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">Related</h2>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/guide/do-flights-still-fly-over-iran"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              Do flights still fly over Iran?
+            </.link>
+            <.link navigate={~p"/guide/london-to-bangkok-route-comparison"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              London to Bangkok: full route comparison
+            </.link>
+            <.link navigate={~p"/guide/why-flights-to-asia-are-longer"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              Why flights to Asia are taking longer
+            </.link>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <footer class="px-6 py-4 border-t border-base-300 text-center shrink-0">
+    <p class="text-xs text-base-content/20">
+      Advisory data only · Verify before booking
+    </p>
+  </footer>
+</div>

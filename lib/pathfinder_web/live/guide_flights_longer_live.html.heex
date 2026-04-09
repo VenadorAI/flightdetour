@@ -1,0 +1,125 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <nav class="px-5 py-3 flex items-center gap-3 border-b border-base-300 shrink-0 flex-wrap">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors shrink-0">
+      <span class="text-base font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/20 shrink-0">›</span>
+    <span class="text-sm text-base-content/45 truncate">Why flights to Asia are longer</span>
+  </nav>
+
+  <div class="flex-1">
+    <div class="max-w-2xl mx-auto px-5 py-10 sm:py-14">
+
+      <div class="mb-10">
+        <h1 class="text-2xl sm:text-3xl font-bold text-base-content tracking-tight mb-3">
+          Why flights to Asia are taking longer
+        </h1>
+        <p class="text-base-content/55 text-sm leading-relaxed max-w-lg">
+          Long-haul routes between Europe and Asia now routinely add one to three hours versus pre-2022 schedules. This is not a scheduling change — it is geography. Airlines are flying longer paths to avoid airspace they previously crossed directly.
+        </p>
+      </div>
+
+      <div class="space-y-10">
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">The two airspace changes that added the time</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              In early 2022, Western carriers lost access to Russian airspace following the conflict in Ukraine. This eliminated the efficient northerly arc — the path that previously took flights from Northern Europe directly over Siberia to Japan and Northeast Asia in roughly eleven hours. Those routes now detour south.
+            </p>
+            <p>
+              Simultaneously, EASA and national civil aviation authorities published escalating advisories around Iranian and Iraqi airspace. Most European airlines rerouted away from the central path through the Tehran FIR that they had historically used for Southeast Asia services. The result: longer paths, more time in the air, and — depending on which corridor your carrier chose — different levels of airspace exposure.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">How much time does each corridor add?</h2>
+          <div class="space-y-2 mb-3">
+            <div class="bg-base-200 rounded-xl px-4 py-3 border border-base-300">
+              <p class="text-xs font-medium text-base-content/70 mb-1">Via Turkey (Istanbul)</p>
+              <p class="text-xs text-base-content/50 leading-relaxed">The least additional time — typically 20–45 minutes on most European-to-Southeast Asia pairs compared to pre-2022 central routings. Routes south of Ukraine and east through Turkish airspace, avoiding the advisory zone on both legs.</p>
+            </div>
+            <div class="bg-base-200 rounded-xl px-4 py-3 border border-base-300">
+              <p class="text-xs font-medium text-base-content/70 mb-1">Via the Gulf (Dubai, Doha, Abu Dhabi)</p>
+              <p class="text-xs text-base-content/50 leading-relaxed">Typically adds 45–90 minutes on European-to-Southeast Asia routes. Routes further south, adding distance. The first leg — Europe to Gulf hub — also transits the active advisory zone on most European departures.</p>
+            </div>
+            <div class="bg-base-200 rounded-xl px-4 py-3 border border-base-300">
+              <p class="text-xs font-medium text-base-content/70 mb-1">Via East Asia (Hong Kong, Seoul)</p>
+              <p class="text-xs text-base-content/50 leading-relaxed">Adds two or more hours on most Europe-to-Southeast Asia pairs. Routes east, entirely avoiding the Middle East advisory zone. The airspace is cleaner but the distance is significantly longer — the tradeoff is time for exposure.</p>
+            </div>
+          </div>
+          <p class="text-xs text-base-content/35 leading-relaxed">
+            FlightDetour tracks this as the Route Directness dimension in each corridor score — so the detour impact is quantified alongside airspace exposure, not buried in a flight time field.
+          </p>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Not all routes feel it equally</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              The increase depends on two things: your specific city pair and which corridor your airline operates. Routes that previously crossed Russian airspace — particularly Northern European departures to Japan and South Korea — gained the most time from the Russia closure. Routes to Southeast Asia were more affected by the Middle East rerouting.
+            </p>
+            <p>
+              Within any given pair, corridor choice also matters. On the same London-to-Bangkok route, a flight via Istanbul and a flight via Dubai have different journey times and different airspace exposure. The Istanbul option typically adds less total time while avoiding the advisory zone on both legs.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Compare the corridors on your route</h2>
+          <p class="text-sm text-base-content/50 mb-3 leading-relaxed">
+            These pairs show the detour difference between corridors most clearly.
+          </p>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/route/london-to-bangkok"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">London → Bangkok</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">3 corridor options →</span>
+            </.link>
+            <.link navigate={~p"/route/frankfurt-to-singapore"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">Frankfurt → Singapore</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Compare corridors →</span>
+            </.link>
+            <.link navigate={~p"/route/london-to-tokyo"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">London → Tokyo</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Central Asian vs East Asian arc →</span>
+            </.link>
+            <.link navigate={~p"/route/amsterdam-to-singapore"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">Amsterdam → Singapore</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Compare corridors →</span>
+            </.link>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">Related</h2>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/guide/do-flights-still-fly-over-iran"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              Do flights still fly over Iran?
+            </.link>
+            <.link navigate={~p"/guide/istanbul-vs-dubai"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              Via Istanbul vs via Dubai: what the difference means now
+            </.link>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <footer class="px-6 py-4 border-t border-base-300 text-center shrink-0">
+    <p class="text-xs text-base-content/20">
+      Advisory data only · Verify before booking
+    </p>
+  </footer>
+</div>

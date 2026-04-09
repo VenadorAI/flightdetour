@@ -1,0 +1,133 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <nav class="px-5 py-3 flex items-center gap-3 border-b border-base-300 shrink-0 flex-wrap">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors shrink-0">
+      <span class="text-base font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/20 shrink-0">›</span>
+    <span class="text-sm text-base-content/45 truncate">London to Bangkok: route comparison</span>
+  </nav>
+
+  <div class="flex-1">
+    <div class="max-w-2xl mx-auto px-5 py-10 sm:py-14">
+
+      <div class="mb-10">
+        <h1 class="text-2xl sm:text-3xl font-bold text-base-content tracking-tight mb-3">
+          London to Bangkok: route comparison
+        </h1>
+        <p class="text-base-content/55 text-sm leading-relaxed max-w-lg">
+          There are three main corridors between London and Bangkok, and they have meaningfully different airspace exposure, journey times, and carrier options. Since 2022, the routing choice carries more weight — and most booking sites don't surface it.
+        </p>
+      </div>
+
+      <div class="space-y-10">
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Via Istanbul — Turkish Airlines</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              Turkish Airlines routes south of Ukraine and east through Turkish airspace, connecting via Istanbul to Bangkok. Both legs — London to Istanbul and Istanbul to Bangkok — generally avoid the Middle East advisory zone. This is the structurally strongest option for most LHR departures right now.
+            </p>
+            <p>
+              Journey time is typically 11–12 hours. Turkish Airlines operates multiple daily LHR–IST departures and frequent IST–BKK connections, giving reasonable rebooking depth. Istanbul (IST) hub is high-capacity and has remained operationally stable throughout the advisory period.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Via Dubai — Emirates</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              Emirates routes south from London through the Middle East, connecting via Dubai. The Europe-to-Dubai leg transits the active airspace advisory zone — this is the corridor's primary risk factor. Emirates operates four or more daily LHR–DXB services and multiple DXB–BKK connections, making it the highest-frequency option on this pair.
+            </p>
+            <p>
+              Journey time is typically 12–13 hours. The Dubai corridor scores lower than Istanbul primarily because of the advisory zone transit on the inbound leg, not because of hub quality or carrier reliability. DXB has demonstrated strong operational resilience throughout the current period.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">Via Hong Kong — Cathay Pacific</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              Cathay Pacific routes east through Central Asian airspace and connects via Hong Kong, entirely avoiding the Middle East advisory zone. This is the cleanest airspace option on this pair — neither leg transits the active advisory region.
+            </p>
+            <p>
+              The tradeoff is journey time: typically 14 or more hours total, significantly longer than the Istanbul or Dubai options. This corridor is most relevant when minimising advisory zone exposure is the primary concern regardless of total travel time.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">What the scores show</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              FlightDetour scores all three corridors on five dimensions: airspace exposure, corridor resilience, hub quality, route directness, and carrier depth. The Istanbul corridor scores highest on this pair — it avoids the advisory zone and avoids the added complexity of the East Asian arc. The Hong Kong corridor scores well for airspace but is marked lower for route directness. Dubai scores lower on airspace but higher on operational depth.
+            </p>
+            <p>
+              The right choice depends on what you prioritise. The comparison page shows all three scored side by side with the current best recommendation and the explanation for why one scores above the others right now.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">See the live comparison</h2>
+          <p class="text-sm text-base-content/50 mb-3 leading-relaxed">
+            The results page compares all three corridors with current scores and a plain-English recommendation.
+          </p>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/route/london-to-bangkok"} class="flex items-center justify-between px-3.5 py-3 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <div>
+                <p class="text-sm font-medium text-base-content/75 group-hover:text-base-content/90">London → Bangkok</p>
+                <p class="text-xs text-base-content/40 mt-0.5">Istanbul · Dubai · Hong Kong — scored and compared</p>
+              </div>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55 shrink-0 ml-3">Compare →</span>
+            </.link>
+          </div>
+
+          <p class="text-xs text-base-content/30 uppercase tracking-widest font-medium mt-6 mb-3">Same corridor logic applies to</p>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/route/london-to-singapore"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">London → Singapore</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Compare corridors →</span>
+            </.link>
+            <.link navigate={~p"/route/london-to-tokyo"} class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group">
+              <span class="text-sm text-base-content/65 group-hover:text-base-content/85">London → Tokyo</span>
+              <span class="text-base-content/30 text-xs group-hover:text-base-content/55">Different corridor mix →</span>
+            </.link>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">Related</h2>
+          <div class="space-y-1.5">
+            <.link navigate={~p"/guide/istanbul-vs-dubai"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              Via Istanbul vs via Dubai: what the difference means now
+            </.link>
+            <.link navigate={~p"/guide/do-flights-still-fly-over-iran"} class="flex items-center gap-2 text-sm text-base-content/50 hover:text-base-content/75 transition-colors">
+              <span class="text-base-content/25">→</span>
+              Do flights still fly over Iran?
+            </.link>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+
+  <footer class="px-6 py-4 border-t border-base-300 text-center shrink-0">
+    <p class="text-xs text-base-content/20">
+      Advisory data only · Verify before booking
+    </p>
+  </footer>
+</div>

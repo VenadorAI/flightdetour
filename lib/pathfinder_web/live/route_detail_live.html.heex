@@ -1,0 +1,487 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <%!-- Navigation --%>
+  <nav class="px-5 py-3 flex items-center gap-3 border-b border-base-300 shrink-0 min-w-0">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors shrink-0">
+      <span class="text-base font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/20 shrink-0">›</span>
+    <.link
+      navigate={back_path(@route, @pair_slug)}
+      class="text-sm text-base-content/50 hover:text-base-content transition-colors truncate min-w-0"
+    >
+      <%= @route.origin_city.name %> → <%= @route.destination_city.name %>
+    </.link>
+    <div class="ml-auto shrink-0">
+      <.link
+        navigate={back_path(@route, @pair_slug)}
+        class="text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
+      >
+        ← Results
+      </.link>
+    </div>
+  </nav>
+
+  <%!-- Page content — normal document scroll, no fixed-height viewport --%>
+  <div class="flex-1">
+    <div class="max-w-2xl mx-auto px-4 pt-4 pb-8">
+
+      <%= if @route.score do %>
+
+        <%!-- Hoist shared values once — reused throughout this block --%>
+        <% iata_o = hd(@route.origin_city.iata_codes || [""]) %>
+        <% iata_d = hd(@route.destination_city.iata_codes || [""]) %>
+        <% detail_freshness = Pathfinder.Advisory.Freshness.for_score(@route.score) %>
+        <% zone_checked_at =
+          @route.disruption_factors
+          |> Enum.map(& &1.disruption_zone && &1.disruption_zone.last_checked_at)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.max(DateTime, fn -> nil end) %>
+        <%!-- Zones that changed AFTER the route was last assessed — explains WHY it is review_required --%>
+        <% changed_zones = if detail_freshness == :review_required do
+          Enum.filter(@route.disruption_factors, fn f ->
+            f.disruption_zone != nil and
+            f.disruption_zone.last_changed_at != nil and
+            (is_nil(@route.last_reviewed_at) or
+             DateTime.compare(f.disruption_zone.last_changed_at, @route.last_reviewed_at) == :gt)
+          end)
+        else
+          []
+        end %>
+
+        <%!-- ── DECISION STRIP ───────────────────────────────────────────── --%>
+        <%!-- Action label respects freshness — stale/review_required override score-based label --%>
+        <% {action_label, action_color, strip_bg} =
+          case detail_freshness do
+            :review_required ->
+              {"Advisory changed — verify before booking", "text-orange-400/90", "bg-orange-400/5 border-orange-400/20"}
+            :stale ->
+              {"Score may be out of date — check airline advisories", "text-orange-400/75", "bg-orange-400/5 border-orange-400/15"}
+            _ ->
+              case @route.score.label do
+                :flowing     -> {"Book with confidence",           "text-emerald-400",   "bg-emerald-400/5 border-emerald-400/20"}
+                :watchful    -> {"Monitor before booking",         "text-amber-400",     "bg-amber-400/5 border-amber-400/20"}
+                :constrained -> {"Book carefully — fewer options", "text-orange-400/90", "bg-orange-400/5 border-orange-400/20"}
+                :strained    -> {"Consider alternatives",          "text-red-400/80",    "bg-red-400/5 border-red-400/20"}
+              end
+          end %>
+
+        <div class={"mb-4 rounded-2xl border px-4 py-4 #{strip_bg}"}>
+          <div class="flex items-center justify-between gap-3 mb-2.5">
+            <span class={"text-base font-bold leading-tight #{action_color}"}><%= action_label %></span>
+            <div class={"shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-semibold #{Pathfinder.Routes.RouteScore.label_bg(@route.score.label)}"}>
+              <div class={"w-2 h-2 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(@route.score.label)}"}></div>
+              <span class={"text-sm #{Pathfinder.Routes.RouteScore.label_color(@route.score.label)}"}>
+                <%= Pathfinder.Routes.RouteScore.label_text(@route.score.label) %>
+              </span>
+              <span class="text-base font-bold text-base-content/80 tabular-nums"><%= @route.score.composite_score %></span>
+            </div>
+          </div>
+          <h1 class="text-lg font-bold text-base-content tracking-tight leading-snug mb-0.5">
+            <%= @route.route_name %>
+          </h1>
+          <p class="text-xs text-base-content/40 mb-2.5">
+            <%= @route.origin_city.name %> → <%= @route.destination_city.name %>
+          </p>
+          <%= if ctx = Pathfinder.Advisory.Freshness.source_context(detail_freshness, zone_checked_at) do %>
+            <p class="text-[10px] text-emerald-400/60 leading-relaxed"><%= ctx %></p>
+          <% else %>
+            <%!-- Show both timestamps in one readable line when available.
+                 "Route last assessed" = when a human reviewed the route data.
+                 "Advisory sources checked" = when automated checks last scanned upstream sources.
+                 These are different: a route can be old but sources confirmed no change. --%>
+            <% review_label = Pathfinder.Advisory.Freshness.route_review_label(@route.last_reviewed_at) %>
+            <% source_label = Pathfinder.Advisory.Freshness.source_check_label(zone_checked_at) %>
+            <%= if review_label || source_label do %>
+              <p class="text-[10px] text-base-content/30 leading-relaxed">
+                <%= [review_label, source_label] |> Enum.reject(&is_nil/1) |> Enum.join(" · ") %>
+              </p>
+            <% end %>
+          <% end %>
+        </div>
+
+        <%!-- ── QUICK FACTS STRIP — 3 columns ──────────────────────────── --%>
+        <div class="mb-4 grid grid-cols-3 gap-2">
+
+          <% {qs_bg, qs_border, qs_text, qs_label} =
+            case @route.score.airspace_score do
+              0 -> {"bg-emerald-400/8", "border-emerald-400/15", "text-emerald-400/80", "Clean"}
+              1 -> {"bg-base-200", "border-base-300", "text-base-content/50", "Near zone"}
+              2 -> {"bg-amber-400/8", "border-amber-400/15", "text-amber-400/80", "Advisory"}
+              _ -> {"bg-red-400/8", "border-red-400/15", "text-red-400/70", "Conflict"}
+            end %>
+          <div class={"rounded-xl p-3 border text-center #{qs_bg} #{qs_border}"}>
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Airspace</p>
+            <p class={"text-xs font-semibold #{qs_text}"}><%= qs_label %></p>
+          </div>
+
+          <% {fb_label, fb_color} = Pathfinder.Scoring.fallback_strength(@route.score.corridor_score) %>
+          <div class="bg-base-200 rounded-xl p-3 border border-base-300 text-center">
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Fallback</p>
+            <p class={"text-xs font-semibold #{fb_color}"}><%= fb_label %></p>
+          </div>
+
+          <div class="bg-base-200 rounded-xl p-3 border border-base-300 text-center">
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">
+              <%= if @route.via_hub_city, do: "Via", else: "Route" %>
+            </p>
+            <%= if @route.via_hub_city do %>
+              <p class="text-xs font-semibold text-base-content/60 truncate">
+                <%= hd(@route.via_hub_city.iata_codes || []) || @route.via_hub_city.name %>
+              </p>
+            <% else %>
+              <p class="text-xs font-semibold text-base-content/60">Direct</p>
+            <% end %>
+            <%= if @route.typical_duration_minutes do %>
+              <p class="text-[10px] text-base-content/25 mt-0.5"><%= duration_label(@route.typical_duration_minutes) %></p>
+            <% end %>
+          </div>
+
+        </div>
+
+        <%!-- ── RECOMMENDATION BLOCK ─────────────────────────────────────── --%>
+        <div class="mb-4 bg-base-200 rounded-xl border border-base-300 divide-y divide-base-300/60">
+          <%= if @route.score.recommendation_text do %>
+            <div class="px-4 py-3 flex items-start gap-3">
+              <span class="text-[10px] text-base-content/30 uppercase tracking-widest font-medium shrink-0 mt-0.5 w-16 pt-px">Best for</span>
+              <p class="text-sm text-base-content/70 leading-relaxed"><%= @route.score.recommendation_text %></p>
+            </div>
+          <% end %>
+          <%= if weakness = Pathfinder.Scoring.main_weakness(@route.score) do %>
+            <div class="px-4 py-3 flex items-start gap-3">
+              <span class="text-[10px] text-base-content/30 uppercase tracking-widest font-medium shrink-0 mt-0.5 w-16 pt-px">Weakness</span>
+              <p class="text-sm text-base-content/55 leading-relaxed"><%= weakness %></p>
+            </div>
+          <% end %>
+          <%= if @route.score.watch_for do %>
+            <div class="px-4 py-3 flex items-start gap-3">
+              <span class="text-[10px] text-amber-400/60 uppercase tracking-widest font-medium shrink-0 mt-0.5 w-16 pt-px">Watch</span>
+              <p class="text-sm text-base-content/65 leading-relaxed"><%= @route.score.watch_for %></p>
+            </div>
+          <% end %>
+        </div>
+
+        <%!-- ── ROUTE MAP — placed after analysis, before booking decision     --%>
+        <%!-- Geography proof: lets users see the actual flight path and which   --%>
+        <%!-- advisory zones it touches, while the analysis is still fresh.      --%>
+        <%= if @route.path_geojson do %>
+          <div class="mb-4">
+            <button
+              phx-click="toggle-map"
+              class={"flex items-center gap-2.5 w-full px-3.5 py-2.5 rounded-xl border transition-all " <>
+                if @show_map,
+                  do:   "bg-base-300/50 border-base-content/18 text-base-content/65",
+                  else: "bg-base-200 border-base-300 text-base-content/45 hover:border-base-content/20 hover:text-base-content/65"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class={"w-3.5 h-3.5 shrink-0 " <> if(@show_map, do: "opacity-55", else: "opacity-35")} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              <span class="flex-1 text-left text-xs font-medium">
+                <%= if @show_map, do: "Route on map", else: "Show route on map" %>
+              </span>
+              <span class={"text-[10px] " <> if(@show_map, do: "text-base-content/35", else: "text-base-content/22")}>
+                <%= if @show_map, do: "↑ hide", else: "↓ show" %>
+              </span>
+            </button>
+            <%= if @show_map do %>
+              <div
+                id="route-map"
+                phx-hook="MapHook"
+                phx-update="ignore"
+                class="mt-1.5 w-full rounded-xl overflow-hidden border border-base-300"
+                style="height: 280px;"
+              ></div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- ── FRESHNESS NOTICE — shown BEFORE the booking CTA so users ─── --%>
+        <%!-- see any data-quality caveats before clicking Search.          --%>
+        <%= if detail_freshness != :current do %>
+          <% freshness_border =
+            case detail_freshness do
+              :review_required -> "bg-orange-400/5 border-orange-400/20"
+              :stale           -> "bg-orange-400/5 border-orange-400/15"
+              :aging           -> "bg-amber-400/5 border-amber-400/15"
+              _                -> "border-base-300"
+            end %>
+          <div class={"mb-4 px-3 py-2.5 rounded-lg border #{freshness_border}"}>
+            <div class="flex items-start gap-2.5">
+              <span class={"shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border #{Pathfinder.Advisory.Freshness.chip_class(detail_freshness)}"}>
+                <%= Pathfinder.Advisory.Freshness.label(detail_freshness) %>
+              </span>
+              <p class={"text-[10px] leading-relaxed #{Pathfinder.Advisory.Freshness.description_color(detail_freshness)}"}>
+                <%= Pathfinder.Advisory.Freshness.description(detail_freshness) %>
+              </p>
+            </div>
+            <%!-- Zone-level callout: which advisory changed, when, and why it matters --%>
+            <%= if length(changed_zones) > 0 do %>
+              <div class="mt-2 pt-2 border-t border-orange-400/10 space-y-1.5">
+                <%= for f <- Enum.uniq_by(changed_zones, & &1.disruption_zone.id) do %>
+                  <div class="flex items-start gap-1.5">
+                    <span class="shrink-0 text-orange-400/50 text-[10px] mt-0.5">→</span>
+                    <p class="text-[10px] text-orange-400/65 leading-snug">
+                      <strong class="font-medium"><%= f.disruption_zone.name %></strong>
+                      changed <%= Pathfinder.Advisory.Freshness.format_age(f.disruption_zone.last_changed_at) %> ago
+                      — this route's <%= Pathfinder.Scoring.dimension_label(f.factor_type) |> String.downcase() %> factor may be affected
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- ── SCORE CAP — shown BEFORE booking CTA so users see the caveat first ─ --%>
+        <%= if @route.score.score_cap_reason do %>
+          <% {cap_bg, cap_border, cap_text} =
+            if @route.score.airspace_score >= 3,
+              do: {"bg-red-400/8", "border-red-400/20", "text-red-400"},
+              else: {"bg-amber-400/8", "border-amber-400/20", "text-amber-400/80"}
+          %>
+          <div class={"mb-4 flex items-start gap-2.5 px-4 py-3 rounded-xl #{cap_bg} border #{cap_border}"}>
+            <span class={"text-xs font-semibold shrink-0 mt-0.5 uppercase tracking-wider #{cap_text}"}>Cap</span>
+            <p class="text-xs text-base-content/55 leading-relaxed"><%= @route.score.score_cap_reason %></p>
+          </div>
+        <% end %>
+
+        <%!-- ── SEARCH CTA ──────────────────────────────────────────────── --%>
+        <%!-- Skyscanner found by key — immune to provider list order --%>
+        <% outbound_links = Pathfinder.Outbound.search_links(iata_o, iata_d) %>
+        <% sky = Enum.find(outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
+        <% sec_links = Enum.reject(outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
+        <%= if sky do %>
+          <% {sky_key, sky_label, _} = sky %>
+          <div class="mb-5 px-4 py-4 rounded-xl border border-base-300 bg-base-200">
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-3">
+              Search flights · <%= Pathfinder.Outbound.search_route_label(iata_o, iata_d) %>
+            </p>
+            <%!-- Skyscanner: primary booking CTA --%>
+            <a
+              href={"/go?provider=#{sky_key}&o=#{iata_o}&d=#{iata_d}&pair=#{@pair_slug}&route_id=#{@route.id}"}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center justify-center gap-1.5 w-full rounded-lg bg-base-content/25 border border-base-content/35 px-4 py-3.5 text-sm font-semibold text-base-content hover:bg-base-content/30 hover:border-base-content/45 transition-all mb-2"
+            >
+              Search on <%= sky_label %> ↗
+            </a>
+            <%!-- All other providers: always tertiary text links --%>
+            <%= if length(sec_links) > 0 do %>
+              <div class="flex items-center justify-center gap-4 flex-wrap mb-3">
+                <%= for {provider_key, label, _url} <- sec_links do %>
+                  <a
+                    href={"/go?provider=#{provider_key}&o=#{iata_o}&d=#{iata_d}&pair=#{@pair_slug}&route_id=#{@route.id}"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors"
+                  >
+                    or <%= label %> ↗
+                  </a>
+                <% end %>
+              </div>
+            <% end %>
+            <%!-- Share link — placed at point of highest intent --%>
+            <div class="border-t border-base-content/8 pt-3 flex justify-center">
+              <button
+                id="share-route-btn"
+                phx-hook="CopyRouteLink"
+                data-url={@page_canonical}
+                data-text={"#{@route.origin_city.name} → #{@route.destination_city.name} #{@route.route_name}#{if @route.score.recommendation_text, do: ": " <> @route.score.recommendation_text, else: ""}"}
+                data-share-title={"FlightDetour: #{@route.origin_city.name} → #{@route.destination_city.name}"}
+                class="text-xs text-base-content/50 hover:text-base-content/75 transition-colors flex items-center gap-1.5"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                <span data-share-label>Share this assessment</span>
+              </button>
+            </div>
+          </div>
+        <% end %>
+
+        <%!-- ── SECONDARY ANALYSIS — collapsible ───────────────────────────── --%>
+        <%!-- Layer scores, ranking context, explanation bullets. Supporting     --%>
+        <%!-- evidence — useful but not required for the booking decision.       --%>
+        <% has_analysis = (@route.score.structural_score && @route.score.pressure_score) ||
+                          @route.score.ranking_context ||
+                          length(@route.score.explanation_bullets) > 0 %>
+        <%= if has_analysis do %>
+          <div class="mb-4">
+            <button
+              phx-click="toggle-analysis"
+              class={"inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-all " <>
+                if @show_analysis,
+                  do:   "bg-base-300/50 border-base-content/15 text-base-content/60",
+                  else: "bg-base-200 border-base-300 text-base-content/38 hover:text-base-content/60 hover:border-base-content/15"}
+            >
+              <%= if @show_analysis, do: "Hide breakdown ↑", else: "Why this score ↓" %>
+            </button>
+            <%= if @show_analysis do %>
+              <div class="mt-3 space-y-3">
+                <%= if @route.score.structural_score && @route.score.pressure_score do %>
+                  <div class="grid grid-cols-2 gap-2">
+                    <%= for {layer_score, layer_name, layer_note} <- [
+                      {@route.score.structural_score, "Structural",       "Corridor alternatives · Hub quality"},
+                      {@route.score.pressure_score,   "Current pressure", "Airspace advisories · Carrier depth"}
+                    ] do %>
+                      <div class="bg-base-200 rounded-xl p-3 border border-base-300">
+                        <div class="flex items-center justify-between mb-1.5">
+                          <span class="text-xs font-medium text-base-content/55"><%= layer_name %></span>
+                          <span class={"text-sm font-bold tabular-nums #{Pathfinder.Routes.RouteScore.layer_label_color(layer_score)}"}><%= layer_score %></span>
+                        </div>
+                        <div class="w-full h-px bg-base-300 rounded-full overflow-hidden mb-1.5">
+                          <div
+                            class={"h-full rounded-full " <>
+                              cond do
+                                layer_score >= 75 -> "bg-emerald-400"
+                                layer_score >= 56 -> "bg-amber-400"
+                                layer_score >= 38 -> "bg-orange-400"
+                                true -> "bg-red-400"
+                              end}
+                            style={"width: #{layer_score}%"}
+                          ></div>
+                        </div>
+                        <p class="text-[10px] text-base-content/25 leading-tight"><%= layer_note %></p>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+                <%= if @route.score.ranking_context do %>
+                  <p class="text-xs text-base-content/38 leading-relaxed"><%= @route.score.ranking_context %></p>
+                <% end %>
+                <%= if length(@route.score.explanation_bullets) > 0 do %>
+                  <ul class="space-y-2">
+                    <%= for bullet <- @route.score.explanation_bullets do %>
+                      <li class="flex items-start gap-2.5 text-xs text-base-content/55 leading-relaxed">
+                        <span class="mt-1.5 shrink-0 w-1 h-1 rounded-full bg-base-content/20"></span>
+                        <%= bullet %>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% end %>
+                <%= if length(@route.disruption_factors) > 0 do %>
+                  <div class="space-y-2 pt-1">
+                    <%= for factor <- @route.disruption_factors do %>
+                      <div class="bg-base-200 rounded-xl px-4 py-3 border border-base-300">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-xs font-medium text-base-content/60">
+                            <%= Pathfinder.Scoring.dimension_label(factor.factor_type) %>
+                          </span>
+                          <span class={"text-xs font-medium #{Pathfinder.Scoring.factor_label_color(factor.factor_score)}"}>
+                            <%= Pathfinder.Scoring.factor_label(factor.factor_score) %>
+                          </span>
+                        </div>
+                        <p class="text-xs text-base-content/50 leading-relaxed"><%= factor.explanation_text %></p>
+                        <%= if factor.disruption_zone do %>
+                          <p class="text-xs text-base-content/25 mt-1"><%= factor.disruption_zone.name %></p>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- Factor detail lives inside score breakdown toggle — no separate toggle needed --%>
+
+        <%!-- Trust + methodology block --%>
+        <div class="mt-1 mb-1 px-4 py-3 rounded-xl bg-base-200/50 border border-base-300/60">
+          <p class="text-[11px] text-base-content/40 leading-relaxed mb-1.5">
+            Evaluated using advisory airspace exposure, corridor sensitivity, detour impact, and hub routing logic — based on EASA and national authority advisories.
+          </p>
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <p class="text-[10px] text-base-content/25 leading-relaxed">
+              Advisory data only · Verify with your airline and government before booking.
+            </p>
+            <.link navigate={~p"/how-it-works"} class="text-[10px] text-base-content/30 hover:text-base-content/55 transition-colors shrink-0">
+              Methodology →
+            </.link>
+          </div>
+        </div>
+
+      <% else %>
+        <%!-- No score: improved empty state --%>
+        <div class="text-center py-14">
+          <div class="w-10 h-10 rounded-full bg-base-200 border border-base-300 flex items-center justify-center mx-auto mb-4">
+            <span class="text-base-content/30 text-base">—</span>
+          </div>
+          <p class="text-base-content/50 mb-1 text-sm font-medium">Score data unavailable</p>
+          <p class="text-xs text-base-content/30 leading-relaxed mb-5">
+            This route hasn't been assessed yet. Try another corridor for this city pair.
+          </p>
+          <.link navigate={back_path(@route, @pair_slug)} class="btn btn-outline btn-sm">
+            ← Back to results
+          </.link>
+        </div>
+      <% end %>
+
+      <%!-- Ad slot --%>
+      <div id="ad-detail-bottom" class="hidden" data-ad-slot="detail_bottom" aria-hidden="true"></div>
+
+      <%!-- Other routes for this pair --%>
+      <%= if length(@sibling_routes) > 0 do %>
+        <div class="mb-5 pt-4 border-t border-base-300">
+          <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-2.5">Other routes for this pair</p>
+          <div class="flex flex-col gap-1.5">
+            <%= for sib <- @sibling_routes do %>
+              <%= if sib.score do %>
+                <.link
+                  navigate={~p"/routes/#{sib.id}"}
+                  class="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
+                >
+                  <div class={"shrink-0 w-1.5 h-1.5 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(sib.score.label)}"}></div>
+                  <span class="text-xs text-base-content/60 group-hover:text-base-content/80 flex-1 truncate"><%= sib.route_name %></span>
+                  <span class={"text-xs font-medium #{Pathfinder.Routes.RouteScore.label_color(sib.score.label)} tabular-nums shrink-0"}>
+                    <%= sib.score.composite_score %>
+                  </span>
+                </.link>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%!-- Internal links --%>
+      <div class="mb-5 flex items-center gap-4 flex-wrap">
+        <.link navigate={~p"/from/#{@route.origin_city.slug}"} class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors">
+          All routes from <%= @route.origin_city.name %> →
+        </.link>
+        <.link navigate={~p"/to/#{@route.destination_city.slug}"} class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors">
+          All routes to <%= @route.destination_city.name %> →
+        </.link>
+        <%= for factor <- @route.disruption_factors do %>
+          <%= if factor.disruption_zone do %>
+            <.link navigate={~p"/disruption/#{factor.disruption_zone.slug}"} class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors">
+              <%= factor.disruption_zone.name %> zone →
+            </.link>
+          <% end %>
+        <% end %>
+      </div>
+
+      <%!-- Footer nav --%>
+      <div class="flex items-center justify-between pt-4 border-t border-base-300">
+        <.link navigate={back_path(@route, @pair_slug)} class="text-sm text-base-content/50 hover:text-base-content transition-colors">
+          ← Back to results
+        </.link>
+        <%= if @route.score do %>
+          <% fo = hd(@route.origin_city.iata_codes || [""]) %>
+          <% fd = hd(@route.destination_city.iata_codes || [""]) %>
+          <% footer_sky = Enum.find(Pathfinder.Outbound.search_links(fo, fd), fn {k, _, _} -> k == :skyscanner end) %>
+          <%= if footer_sky do %>
+            <% {fsk, fsl, _} = footer_sky %>
+            <a
+              href={"/go?provider=#{fsk}&o=#{fo}&d=#{fd}&pair=#{@pair_slug}&route_id=#{@route.id}"}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors"
+            >
+              Search on <%= fsl %> ↗
+            </a>
+          <% end %>
+        <% end %>
+      </div>
+
+    </div>
+  </div>
+</div>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title default="FlightDetour">
+      {assigns[:page_title]}
+    </.live_title>
+    <%!-- SEO: description --%>
+    <meta name="description" content={assigns[:page_description] || "FlightDetour — compare long-haul flight routes by airspace risk, not price. See which corridors cross advisory zones before you book."} />
+    <%!-- Open Graph --%>
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FlightDetour" />
+    <meta property="og:title" content={assigns[:page_title] || "FlightDetour · Flight Routing Intelligence"} />
+    <meta property="og:description" content={assigns[:page_description] || "Compare long-haul flight corridors on airspace exposure and routing risk — not just price. Via Dubai or via Istanbul: which route is safer right now?"} />
+    <meta property="og:url" content={assigns[:page_canonical] || PathfinderWeb.Endpoint.url() <> "/"} />
+    <meta property="og:image" content={assigns[:page_image] || PathfinderWeb.Endpoint.url() <> "/images/og-default.png"} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={assigns[:page_title] || "FlightDetour · Flight Routing Intelligence"} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={assigns[:page_title] || "FlightDetour · Flight Routing Intelligence"} />
+    <meta name="twitter:description" content={assigns[:page_description] || "Compare long-haul flight corridors on airspace exposure and routing risk — not just price."} />
+    <meta name="twitter:image" content={assigns[:page_image] || PathfinderWeb.Endpoint.url() <> "/images/og-default.png"} />
+    <%!-- Canonical URL (set per-page via page_canonical assign) --%>
+    <%= if url = assigns[:page_canonical] do %>
+      <link rel="canonical" href={url} />
+    <% end %>
+    <%!-- Noindex for internal/admin pages --%>
+    <%= if assigns[:page_noindex] do %>
+      <meta name="robots" content="noindex, nofollow" />
+    <% end %>
+    <%!-- Google Search Console verification — set GOOGLE_SITE_VERIFICATION env var --%>
+    <%= if token = Application.get_env(:pathfinder, :gsc_token) do %>
+      <meta name="google-site-verification" content={token} />
+    <% end %>
+    <%!-- Plausible analytics — privacy-friendly, no cookies. Set PLAUSIBLE_DOMAIN env var. --%>
+    <%= if domain = Application.get_env(:pathfinder, :plausible_domain) do %>
+      <script defer data-domain={domain} src="https://plausible.io/js/script.js"></script>
+    <% end %>
+    <%!-- Organization JSON-LD — sitewide --%>
+    <script type="application/ld+json"><%= raw(Jason.encode!(%{
+      "@context" => "https://schema.org",
+      "@type" => "Organization",
+      "name" => "FlightDetour",
+      "description" => "Flight routing intelligence for long-haul travel. Compare corridors by airspace exposure and routing risk before you book.",
+      "url" => PathfinderWeb.Endpoint.url()
+    })) %></script>
+    <%!-- Per-page structured data (BreadcrumbList, WebPage, etc.) --%>
+    <%= if sd = assigns[:structured_data] do %>
+      <script type="application/ld+json"><%= raw(sd) %></script>
+    <% end %>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+    <script>
+      (() => {
+        const setTheme = (theme) => {
+          if (theme === "system") {
+            localStorage.removeItem("phx:theme");
+            document.documentElement.removeAttribute("data-theme");
+          } else {
+            localStorage.setItem("phx:theme", theme);
+            document.documentElement.setAttribute("data-theme", theme);
+          }
+        };
+        if (!document.documentElement.hasAttribute("data-theme")) {
+          setTheme(localStorage.getItem("phx:theme") || "system");
+        }
+        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
+        
+        window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+      })();
+    </script>
+  </head>
+  <body class="bg-base-100 text-base-content antialiased" data-theme="dark">
+    {@inner_content}
+  </body>
+</html>

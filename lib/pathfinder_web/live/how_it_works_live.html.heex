@@ -1,0 +1,192 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <nav class="px-5 py-3 flex items-center gap-4 border-b border-base-300 shrink-0">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors">
+      <span class="text-lg font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/25">›</span>
+    <span class="text-sm text-base-content/60">How it works</span>
+  </nav>
+
+  <div class="flex-1">
+    <div class="max-w-2xl mx-auto px-5 py-10 sm:py-14">
+
+      <%!-- Header --%>
+      <div class="mb-10">
+        <h1 class="text-2xl sm:text-3xl font-bold text-base-content tracking-tight mb-3">
+          How FlightDetour works
+        </h1>
+        <p class="text-base-content/55 text-sm leading-relaxed max-w-lg">
+          What the scores mean, how they're produced, and what you should and shouldn't conclude from them.
+        </p>
+      </div>
+
+      <div class="space-y-10">
+
+        <%!-- Section 1: What FlightDetour is --%>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">What FlightDetour is</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              FlightDetour compares long-haul flight corridors on airspace exposure, routing logic, and fallback options — before you decide where to book.
+            </p>
+            <p>
+              It is not a booking engine, a real-time flight tracker, or an official travel advisory. It does not have access to live airline data, ATC feeds, or classified threat assessments.
+            </p>
+            <p>
+              What it does: takes publicly available advisory information — primarily from EASA and national civil aviation authorities — and turns it into structured route scores that make corridor risk comparable side by side.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <%!-- Section 2: Route scores --%>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">How route scores work</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed mb-5">
+            <p>
+              Each route receives a composite score from 0 to 100, calculated from five independent dimensions. Higher scores reflect better current positioning — not safety in absolute terms.
+            </p>
+          </div>
+
+          <div class="space-y-2 mb-5">
+            <%= for {name, note} <- [
+              {"Airspace exposure", "Whether the route transits active advisory or conflict zones. Most heavily weighted — a route crossing an active advisory zone is capped regardless of other factors."},
+              {"Corridor resilience", "How many meaningful alternative routes exist for this city pair. Pairs with only one viable corridor are structurally fragile when conditions change."},
+              {"Hub quality", "The reliability and depth of the connecting airport for one-stop routes. Hubs near advisory zones are scored lower."},
+              {"Route complexity", "Layover count and transfer risk. Direct routes score higher than multi-stop itineraries on complex corridors."},
+              {"Operational depth", "Carrier variety on the route. Corridors with only one airline have less flexibility when disruptions occur."}
+            ] do %>
+              <div class="bg-base-200 rounded-xl px-4 py-3 border border-base-300">
+                <p class="text-xs font-medium text-base-content/70 mb-0.5"><%= name %></p>
+                <p class="text-xs text-base-content/45 leading-relaxed"><%= note %></p>
+              </div>
+            <% end %>
+          </div>
+
+          <div class="space-y-2">
+            <p class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">Score bands</p>
+            <%= for {label, range, desc, class} <- [
+              {"Flowing", "75–100", "No active advisory zone exposure. Multiple corridor alternatives. Book with confidence.", "text-emerald-400/80"},
+              {"Watchful", "56–74", "Viable but worth monitoring. Near advisory zones, or limited corridor alternatives.", "text-amber-400/70"},
+              {"Constrained", "38–55", "Under pressure. May transit advisory zones. Fewer options if conditions worsen.", "text-orange-400/70"},
+              {"Strained", "0–37", "Significantly affected. High advisory exposure or very limited fallback routes.", "text-red-400/70"}
+            ] do %>
+              <div class="flex items-start gap-3 px-4 py-3 bg-base-200 rounded-xl border border-base-300">
+                <span class={"text-xs font-semibold shrink-0 w-20 pt-px #{class}"}><%= label %> · <%= range %></span>
+                <p class="text-xs text-base-content/50 leading-relaxed"><%= desc %></p>
+              </div>
+            <% end %>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <%!-- Section 3: Advisory zones --%>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">What advisory zones mean</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed mb-5">
+            <p>
+              Advisory zones are airspace regions where civil aviation safety authorities have formally documented elevated risk — typically due to active conflicts, missile activity, or military operations at altitude. The primary source FlightDetour monitors is EASA's conflict zone risk assessment system.
+            </p>
+            <p>
+              An advisory zone is not a flight ban. Airlines can and do operate through or near them, sometimes with procedural mitigation. But routes that transit these zones carry documented risk that has prompted formal authority-level guidance.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <%= for {level, desc, class} <- [
+              {"Clean (0)", "Route avoids all active advisory zones. Cleanest available option for this corridor.", "text-emerald-400/80"},
+              {"Near zone (1)", "Route passes near an advisory zone but does not transit through it. Some adjacency exposure.", "text-base-content/55"},
+              {"Advisory (2)", "Route transits an active advisory zone. Risk is formally documented by EASA or equivalent. Review before booking.", "text-amber-400/70"},
+              {"Conflict (3)", "Route crosses a high-severity zone. Significant documented exposure. Check airline notices carefully.", "text-red-400/70"}
+            ] do %>
+              <div class="flex items-start gap-3 px-4 py-3 bg-base-200 rounded-xl border border-base-300">
+                <span class={"text-xs font-semibold shrink-0 w-24 pt-px #{class}"}><%= level %></span>
+                <p class="text-xs text-base-content/50 leading-relaxed"><%= desc %></p>
+              </div>
+            <% end %>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <%!-- Section 4: Freshness --%>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">What freshness means</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed mb-5">
+            <p>
+              A score is only useful if it reflects current conditions. FlightDetour tracks two signals separately: when advisory source pages were last checked for changes, and when a human last reviewed and confirmed the route assessment.
+            </p>
+            <p>
+              These are intentionally distinct. A route can be flagged "stale" even when no advisory source has changed — because the human review is outdated. And a route can show a recent source check without being fully current.
+            </p>
+          </div>
+
+          <div class="space-y-2 mb-4">
+            <%= for {state, desc, class} <- [
+              {"Current", "Assessed within the last 7 days. No source changes since last review.", "text-emerald-400/70"},
+              {"Aging", "Assessed 7–30 days ago. Still directionally valid — check sources if booking within days.", "text-amber-400/70"},
+              {"Stale", "Not reviewed in over 30 days. Treat as a baseline. Verify with your airline before booking.", "text-orange-400/70"},
+              {"Advisory changed", "An upstream source changed after this route was last reviewed. The score is provisional until a human confirms the update.", "text-red-400/70"}
+            ] do %>
+              <div class="flex items-start gap-3 px-4 py-3 bg-base-200 rounded-xl border border-base-300">
+                <span class={"text-xs font-semibold shrink-0 w-28 pt-px #{class}"}><%= state %></span>
+                <p class="text-xs text-base-content/50 leading-relaxed"><%= desc %></p>
+              </div>
+            <% end %>
+          </div>
+
+          <p class="text-xs text-base-content/35 leading-relaxed">
+            Advisory sources are automatically checked every 6 hours. When a source page changes, affected routes are flagged for human review. Freshness state is recomputed daily and shown on every route card.
+          </p>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <%!-- Section 5: Limitations --%>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">What FlightDetour cannot tell you</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              A higher score means a route is better-positioned relative to current advisory conditions — not that it is safe in an absolute sense. FlightDetour does not assess mechanical risk, airline reliability, weather, or geopolitical risk below the altitude threshold of civil aviation advisories.
+            </p>
+            <p>
+              Coverage focuses on high-traffic long-haul corridors where advisory exposure is meaningful. If your pair isn't listed, that's a coverage gap — not an implicit assessment.
+            </p>
+            <p>
+              Source monitoring can fail. If an advisory authority changes their page structure, automated checks may miss the update until the system is repaired. This is why freshness state is tracked and shown explicitly — it is a direct signal of data reliability.
+            </p>
+          </div>
+        </section>
+
+        <div class="border-t border-base-300"></div>
+
+        <%!-- Section 6: What to do --%>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-4">How to use this</h2>
+          <div class="space-y-3 text-sm text-base-content/65 leading-relaxed">
+            <p>
+              FlightDetour is most useful when multiple corridor options exist for the same city pair and you want to understand their relative advisory exposure — for example, via Dubai vs via Istanbul vs via Singapore for a Europe–Asia journey.
+            </p>
+            <p>
+              Before booking, always check your government's current travel advisory (FCDO, State Department, DFAT, or equivalent) and your airline's published routing and safety notices. These are authoritative. FlightDetour is a secondary intelligence layer.
+            </p>
+          </div>
+        </section>
+
+      </div>
+
+      <%!-- Footer nav --%>
+      <div class="mt-12 pt-6 border-t border-base-300 flex items-center justify-between flex-wrap gap-3">
+        <.link navigate={~p"/"} class="text-sm text-base-content/50 hover:text-base-content transition-colors">
+          ← Compare a route
+        </.link>
+        <p class="text-xs text-base-content/25">
+          Advisory assessments only. Verify with your airline and government before travel.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>

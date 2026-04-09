@@ -1,0 +1,130 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <.flash kind={:info} flash={@flash} />
+
+  <%!-- Navigation --%>
+  <nav class="px-5 py-3 flex items-center gap-3 border-b border-base-300 shrink-0">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors shrink-0">
+      <span class="text-lg font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/25">›</span>
+    <span class="text-sm text-base-content/60">Disruption Zones</span>
+    <span class="text-base-content/25">›</span>
+    <span class="text-sm text-base-content/80 truncate"><%= @zone.name %></span>
+  </nav>
+
+  <%!-- Zone map --%>
+  <div class="relative w-full shrink-0" style="height: 36vh; min-height: 200px;">
+    <div
+      id="map-skeleton"
+      class="absolute inset-0 bg-base-200 flex items-center justify-center z-10 pointer-events-none transition-opacity duration-500"
+    >
+      <div class="flex flex-col items-center gap-3 opacity-30">
+        <div class="w-8 h-8 border-2 border-base-content/30 border-t-base-content/70 rounded-full animate-spin"></div>
+      </div>
+    </div>
+    <div
+      id="zone-map"
+      phx-hook="ZoneMapHook"
+      phx-update="ignore"
+      class="absolute inset-0"
+    ></div>
+  </div>
+
+  <%!-- Content --%>
+  <div class="flex-1 overflow-y-auto">
+    <div class="max-w-2xl mx-auto px-4 py-6">
+
+      <%!-- Zone header --%>
+      <div class="mb-6">
+        <div class="flex items-start justify-between gap-4 mb-2">
+          <h1 class="text-2xl font-bold text-base-content tracking-tight leading-tight">
+            <%= @zone.name %>
+          </h1>
+          <div class="shrink-0 flex flex-col items-end gap-1">
+            <span class={"text-sm font-semibold #{status_color(@zone.status)}"}>
+              ● <%= status_label(@zone.status) %>
+            </span>
+            <span class="text-xs text-base-content/40"><%= zone_type_label(@zone.zone_type) %></span>
+          </div>
+        </div>
+        <%= if @zone.last_updated_at do %>
+          <p class="text-xs text-base-content/30">
+            <%= case Pathfinder.Advisory.Freshness.format_age(@zone.last_updated_at) do
+              nil -> Calendar.strftime(@zone.last_updated_at, "%B %d, %Y")
+              age -> "Advisory profile updated #{age}"
+            end %>
+          </p>
+        <% end %>
+      </div>
+
+      <%!-- Summary --%>
+      <div class="mb-5 bg-base-200 rounded-xl p-4 border border-base-300">
+        <p class="text-sm text-base-content/80 leading-relaxed">
+          <%= @zone.summary_text %>
+        </p>
+      </div>
+
+      <%!-- Detail text --%>
+      <%= if @zone.detail_text do %>
+        <div class="mb-5 text-sm text-base-content/60 leading-relaxed space-y-3">
+          <p><%= @zone.detail_text %></p>
+        </div>
+      <% end %>
+
+      <%!-- Affected regions --%>
+      <%= if length(@zone.affected_regions) > 0 do %>
+        <div class="mb-5">
+          <p class="text-xs text-base-content/30 uppercase tracking-widest mb-2">Affected regions</p>
+          <div class="flex flex-wrap gap-2">
+            <%= for region <- @zone.affected_regions do %>
+              <span class="px-3 py-1 rounded-full bg-base-200 border border-base-300 text-xs text-base-content/60">
+                <%= region %>
+              </span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%!-- Routes affected --%>
+      <%= if length(@affected_routes) > 0 do %>
+        <div class="mb-6">
+          <p class="text-xs text-base-content/30 uppercase tracking-widest mb-3">Routes where this zone is a scoring factor</p>
+          <div class="space-y-2">
+            <%= for {route, score} <- @affected_routes do %>
+              <% pair_slug = Pathfinder.CitySlug.pair_slug(route.origin_city.name, route.destination_city.name) %>
+              <.link
+                navigate={~p"/route/#{pair_slug}"}
+                class="flex items-center justify-between bg-base-200 rounded-xl px-4 py-3 border border-base-300 hover:border-base-content/20 transition-colors group"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-base-content truncate">
+                    <%= route.origin_city.name %> → <%= route.destination_city.name %>
+                  </p>
+                  <p class="text-xs text-base-content/40 truncate"><%= route.route_name %></p>
+                </div>
+                <%= if score do %>
+                  <div class={"shrink-0 ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold #{Pathfinder.Routes.RouteScore.label_bg(score.label)}"}>
+                    <div class={"w-1.5 h-1.5 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(score.label)}"}></div>
+                    <span class={Pathfinder.Routes.RouteScore.label_color(score.label)}>
+                      <%= Pathfinder.Routes.RouteScore.label_text(score.label) %>
+                    </span>
+                  </div>
+                <% end %>
+              </.link>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%!-- Methodology + trust note --%>
+      <div class="border-t border-base-300 pt-5 space-y-1.5">
+        <p class="text-xs text-base-content/35 leading-relaxed">
+          Zone assessments are based on publicly available advisories from EASA and national civil aviation authorities. FlightDetour does not provide real-time safety data or operational flight guidance.
+        </p>
+        <p class="text-[10px] text-base-content/20 leading-relaxed">
+          Consult your airline and official government travel advisories before booking.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

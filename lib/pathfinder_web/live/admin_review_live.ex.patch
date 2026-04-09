@@ -1,0 +1,9 @@
+--- a/admin_review_live.ex
++++ b/admin_review_live.ex
+@@ -128,3 +128,6 @@ end
+   defp format_dt(nil), do: "—"
+   defp format_dt(%DateTime{} = dt), do: Freshness.format_age(dt) || Calendar.strftime(dt, "%b %d %H:%M UTC")
++
++  defp format_date(nil), do: "—"
++  defp format_date(dt), do: Calendar.strftime(dt, "%b %d, %Y")
+ end

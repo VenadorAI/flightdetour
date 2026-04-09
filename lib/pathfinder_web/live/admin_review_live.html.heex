@@ -1,0 +1,609 @@
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+  <nav class="px-5 py-3 flex items-center gap-4 border-b border-base-300 shrink-0">
+    <.link navigate={~p"/"} class="text-base-content/40 hover:text-base-content transition-colors">
+      <span class="text-lg font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <span class="text-base-content/20">›</span>
+    <span class="text-sm text-base-content/60">Advisory Review</span>
+    <div class="ml-auto flex items-center gap-2">
+      <button
+        phx-click="run-freshness-job"
+        class="text-xs px-3 py-1.5 rounded-lg bg-base-300 hover:bg-base-content/10 text-base-content/40 hover:text-base-content/70 transition-all font-medium"
+      >
+        Run freshness job
+      </button>
+      <button
+        phx-click="run-check"
+        class="text-xs px-3 py-1.5 rounded-lg bg-base-300 hover:bg-base-content/10 text-base-content/60 hover:text-base-content transition-all font-medium"
+      >
+        <%= if @check_running, do: "Checking…", else: "Run advisory check" %>
+      </button>
+    </div>
+  </nav>
+
+  <%= if @last_check_result do %>
+    <div class="px-6 py-2 text-xs text-base-content/50 bg-base-200 border-b border-base-300">
+      <%= @last_check_result %>
+    </div>
+  <% end %>
+
+  <div class="flex-1 overflow-y-auto">
+    <div class="max-w-5xl mx-auto px-5 py-6 space-y-8">
+
+      <%!-- Health summary --%>
+      <section>
+        <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">System Health</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+          <%!-- Source checker health --%>
+          <div class={"rounded-xl border px-4 py-3 " <>
+            cond do
+              @health.critically_failing_sources > 0 -> "border-red-400/30 bg-red-400/5"
+              not @health.checker_healthy             -> "border-orange-400/30 bg-orange-400/5"
+              true                                   -> "border-base-300 bg-base-200"
+            end}>
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Source checker</p>
+            <%= cond do %>
+              <% @health.critically_failing_sources > 0 -> %>
+                <p class="text-xs font-semibold text-red-400/80"><%= @health.critically_failing_sources %> source(s) failing</p>
+              <% @health.checker_healthy -> %>
+                <p class="text-xs font-semibold text-emerald-400/80">Healthy</p>
+              <% true -> %>
+                <p class="text-xs font-semibold text-orange-400/80">
+                  <%= if is_nil(@health.last_source_check), do: "Never run", else: "#{@health.stale_source_count} source(s) stale" %>
+                </p>
+            <% end %>
+            <p class="text-[10px] text-base-content/30 mt-1">
+              Last check: <%= if @health.last_source_check, do: format_dt(@health.last_source_check), else: "—" %>
+            </p>
+          </div>
+
+          <%!-- Review queue --%>
+          <% review_count = Map.get(@health.freshness_counts, "review_required", 0) + Map.get(@health.freshness_counts, "stale", 0) %>
+          <div class={"rounded-xl border px-4 py-3 " <> if(review_count > 0, do: "border-red-400/25 bg-red-400/5", else: "border-base-300 bg-base-200")}>
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Need review</p>
+            <p class={"text-xl font-bold tabular-nums " <> if(review_count > 0, do: "text-red-400/80", else: "text-base-content/50")}>
+              <%= review_count %>
+            </p>
+            <p class="text-[10px] text-base-content/30 mt-1">
+              <%= Map.get(@health.freshness_counts, "review_required", 0) %> flagged ·
+              <%= Map.get(@health.freshness_counts, "stale", 0) %> stale
+            </p>
+          </div>
+
+          <%!-- Aging --%>
+          <% aging_count = Map.get(@health.freshness_counts, "aging", 0) %>
+          <div class={"rounded-xl border px-4 py-3 " <> if(aging_count > 0, do: "border-amber-400/20 bg-amber-400/5", else: "border-base-300 bg-base-200")}>
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Aging</p>
+            <p class={"text-xl font-bold tabular-nums " <> if(aging_count > 0, do: "text-amber-400/70", else: "text-base-content/50")}>
+              <%= aging_count %>
+            </p>
+            <p class="text-[10px] text-base-content/30 mt-1">reviewed 7–30 days ago</p>
+          </div>
+
+          <%!-- Current --%>
+          <div class="rounded-xl border border-base-300 bg-base-200 px-4 py-3">
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Current</p>
+            <p class="text-xl font-bold tabular-nums text-emerald-400/70">
+              <%= Map.get(@health.freshness_counts, "current", 0) %>
+            </p>
+            <p class="text-[10px] text-base-content/30 mt-1">of <%= @health.total_routes %> total active routes</p>
+          </div>
+
+        </div>
+      </section>
+
+      <%!-- Disruption zones — sorted by last changed (most recent first) --%>
+      <section>
+        <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">Disruption Zones</h2>
+        <div class="rounded-xl border border-base-300 overflow-hidden">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-base-300 bg-base-200">
+                <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Zone</th>
+                <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Source</th>
+                <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Last checked</th>
+                <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Last changed ↓</th>
+                <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Routes</th>
+                <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Status</th>
+                <th class="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-base-300">
+              <%= for zone <- @zones do %>
+                <tr class="hover:bg-base-200/50">
+                  <td class="px-4 py-3">
+                    <div>
+                      <span class="font-medium text-base-content/80"><%= zone.name %></span>
+                      <span class={"ml-1.5 text-[10px] font-medium uppercase #{if zone.status == :active, do: "text-red-400/70", else: "text-base-content/30"}"}>
+                        <%= zone.status %>
+                      </span>
+                    </div>
+                    <div class="text-base-content/30 mt-0.5">
+                      <span class={"text-[10px] capitalize #{if zone.severity in [:high, :critical], do: "text-orange-400/60", else: "text-base-content/30"}"}><%= zone.severity %></span>
+                      <%= if zone.source_revision_date do %>
+                        <span class="text-base-content/20"> · rev <%= format_date(zone.source_revision_date) %></span>
+                      <% end %>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-base-content/45">
+                    <%= if zone.source_name do %>
+                      <%= if zone.source_url do %>
+                        <a href={zone.source_url} target="_blank" rel="noopener noreferrer"
+                           class="hover:text-base-content/70 transition-colors">
+                          <%= zone.source_name %> ↗
+                        </a>
+                      <% else %>
+                        <%= zone.source_name %>
+                      <% end %>
+                    <% else %>
+                      <span class="text-base-content/25">—</span>
+                    <% end %>
+                  </td>
+                  <td class="px-4 py-3 text-base-content/40"><%= format_dt(zone.last_checked_at) %></td>
+                  <td class="px-4 py-3 text-base-content/40"><%= format_dt(zone.last_changed_at) %></td>
+                  <td class="px-4 py-3 text-base-content/40">
+                    <% count = Map.get(@zone_route_counts, zone.id, 0) %>
+                    <%= if count > 0 do %>
+                      <span class="text-base-content/60"><%= count %></span>
+                    <% else %>
+                      <span class="text-base-content/20">0</span>
+                    <% end %>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class={"text-xs font-medium #{zone_status_class(zone.review_status)}"}>
+                      <%= if zone.review_status == "review_required", do: "Needs review", else: "Current" %>
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-1.5">
+                      <%= if zone.review_status == "review_required" do %>
+                        <button
+                          phx-click="mark-zone-current"
+                          phx-value-zone-id={zone.id}
+                          class="text-[10px] px-2 py-1 rounded bg-base-300 hover:bg-base-content/10 text-base-content/50 hover:text-base-content transition-all"
+                        >
+                          Mark current
+                        </button>
+                      <% end %>
+                      <button
+                        phx-click="start-edit-zone"
+                        phx-value-zone-id={zone.id}
+                        class="text-[10px] px-2 py-1 rounded bg-base-300 hover:bg-base-content/10 text-base-content/35 hover:text-base-content transition-all"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <%!-- Inline edit panel --%>
+                <%= if @editing_zone_id == zone.id do %>
+                  <tr class="bg-base-200/60">
+                    <td colspan="7" class="px-4 py-4 border-t border-base-300/60">
+                      <form phx-submit="save-zone" class="flex flex-col gap-3 max-w-lg">
+                        <input type="hidden" name="zone_id" value={zone.id} />
+                        <div class="grid grid-cols-2 gap-3">
+                          <div>
+                            <label class="text-[10px] text-base-content/40 uppercase tracking-widest block mb-1">Status</label>
+                            <select name="status" class="w-full bg-base-300 border border-base-300 rounded-lg px-2.5 py-1.5 text-xs text-base-content/80 focus:outline-none focus:border-primary">
+                              <%= for s <- [:active, :monitoring, :resolved] do %>
+                                <option value={s} selected={zone.status == s}><%= s %></option>
+                              <% end %>
+                            </select>
+                          </div>
+                          <div>
+                            <label class="text-[10px] text-base-content/40 uppercase tracking-widest block mb-1">Severity</label>
+                            <select name="severity" class="w-full bg-base-300 border border-base-300 rounded-lg px-2.5 py-1.5 text-xs text-base-content/80 focus:outline-none focus:border-primary">
+                              <%= for s <- [:low, :moderate, :high, :critical] do %>
+                                <option value={s} selected={zone.severity == s}><%= s %></option>
+                              <% end %>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="text-[10px] text-base-content/40 uppercase tracking-widest block mb-1">Summary text</label>
+                          <textarea
+                            name="summary_text"
+                            rows="2"
+                            class="w-full bg-base-300 border border-base-300 rounded-lg px-2.5 py-1.5 text-xs text-base-content/80 focus:outline-none focus:border-primary resize-none"
+                          ><%= zone.summary_text %></textarea>
+                        </div>
+                        <div class="flex items-center gap-2">
+                          <button type="submit" class="text-[10px] px-3 py-1.5 rounded-lg bg-primary/80 hover:bg-primary text-white font-medium transition-all">
+                            Save
+                          </button>
+                          <button type="button" phx-click="cancel-edit-zone" class="text-[10px] px-3 py-1.5 rounded-lg bg-base-300 hover:bg-base-content/10 text-base-content/50 transition-all">
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                <% end %>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <%!-- Routes needing attention --%>
+      <section>
+        <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">
+          Routes Needing Review
+          <%= if length(@routes_needing_review) > 0 do %>
+            <span class="ml-1.5 normal-case text-base-content/25">(<%= length(@routes_needing_review) %>)</span>
+          <% end %>
+        </h2>
+
+        <%= if Enum.empty?(@routes_needing_review) do %>
+          <div class="rounded-xl border border-base-300 px-4 py-6 text-center text-xs text-base-content/30">
+            No routes need review — all assessments are current.
+          </div>
+        <% else %>
+          <div class="rounded-xl border border-base-300 overflow-hidden">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-base-300 bg-base-200">
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Route</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Pair</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Score</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Last reviewed</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">State · Why</th>
+                  <th class="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-base-300">
+                <%= for route <- @routes_needing_review do %>
+                  <% changed_zones = Map.get(@changed_zones_by_route, route.id, []) %>
+                  <tr class="hover:bg-base-200/50">
+                    <td class="px-4 py-3">
+                      <.link navigate={~p"/routes/#{route.id}"} class="font-medium text-base-content/80 hover:text-base-content transition-colors">
+                        <%= route.route_name %>
+                      </.link>
+                    </td>
+                    <td class="px-4 py-3 text-base-content/45">
+                      <%= route.origin_city.name %> → <%= route.destination_city.name %>
+                    </td>
+                    <td class="px-4 py-3 text-base-content/50">
+                      <%= route.score.composite_score %> · <%= route.score.label %>
+                    </td>
+                    <td class="px-4 py-3 text-base-content/40">
+                      <%= format_dt(route.last_reviewed_at) %>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class={"text-[10px] font-medium px-1.5 py-0.5 rounded-full border #{freshness_badge_class(route.score.freshness_state)}"}>
+                        <%= freshness_label(route.score.freshness_state) %>
+                      </span>
+                      <%!-- Show which zone(s) changed and triggered the flag --%>
+                      <%= if length(changed_zones) > 0 do %>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          <%= for zone <- changed_zones do %>
+                            <.link navigate={~p"/disruption/#{zone.zone_slug}"}
+                               class="text-[10px] text-red-400/60 hover:text-red-400/80 transition-colors">
+                              <%= zone.zone_name %> changed ↗
+                            </.link>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex flex-col items-end gap-1.5">
+                        <div class="flex items-center gap-1.5">
+                          <button
+                            phx-click="rescore-route"
+                            phx-value-route-id={route.id}
+                            class="text-[10px] px-2 py-1 rounded bg-base-300 hover:bg-base-content/10 text-base-content/35 hover:text-base-content transition-all"
+                          >
+                            Rescore
+                          </button>
+                          <button
+                            phx-click="mark-reviewed"
+                            phx-value-route-id={route.id}
+                            class="text-[10px] px-2 py-1 rounded bg-base-300 hover:bg-base-content/10 text-base-content/50 hover:text-base-content transition-all"
+                          >
+                            Mark reviewed
+                          </button>
+                        </div>
+                        <%!-- Dev: force freshness state for testing --%>
+                        <div class="flex items-center gap-1">
+                          <span class="text-[9px] text-base-content/20">Force:</span>
+                          <%= for {label, state} <- [{"cur", "current"}, {"aging", "aging"}, {"stale", "stale"}, {"rev_req", "review_required"}] do %>
+                            <button
+                              phx-click="force-freshness"
+                              phx-value-route-id={route.id}
+                              phx-value-state={state}
+                              class={"text-[9px] px-1.5 py-0.5 rounded transition-all " <>
+                                if route.score.freshness_state == state,
+                                  do: "bg-primary/20 text-primary/80",
+                                  else: "bg-base-300 text-base-content/25 hover:text-base-content/55"}
+                            >
+                              <%= label %>
+                            </button>
+                          <% end %>
+                        </div>
+                        <%!-- Trust reminder for review_required routes --%>
+                        <%= if route.score.freshness_state == "review_required" do %>
+                          <p class="text-[9px] text-base-content/20 text-right max-w-28 leading-tight">
+                            Only mark reviewed after checking the advisory source
+                          </p>
+                        <% end %>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      </section>
+
+      <%!-- Aging routes --%>
+      <%= if length(@aging_routes) > 0 do %>
+        <section>
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-3">
+            Aging Routes
+            <span class="ml-1.5 normal-case text-base-content/25">(<%= length(@aging_routes) %>)</span>
+          </h2>
+          <div class="rounded-xl border border-base-300 overflow-hidden">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-base-300 bg-base-200">
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Route</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Pair</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Score</th>
+                  <th class="text-left px-4 py-2.5 text-base-content/40 font-medium">Last reviewed</th>
+                  <th class="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-base-300">
+                <%= for route <- @aging_routes do %>
+                  <tr class="hover:bg-base-200/50">
+                    <td class="px-4 py-3">
+                      <.link navigate={~p"/routes/#{route.id}"} class="font-medium text-base-content/60 hover:text-base-content transition-colors">
+                        <%= route.route_name %>
+                      </.link>
+                    </td>
+                    <td class="px-4 py-3 text-base-content/40">
+                      <%= route.origin_city.name %> → <%= route.destination_city.name %>
+                    </td>
+                    <td class="px-4 py-3 text-base-content/45">
+                      <%= route.score.composite_score %> · <%= route.score.label %>
+                    </td>
+                    <td class="px-4 py-3 text-amber-400/50">
+                      <%= format_dt(route.last_reviewed_at) %>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <div class="flex items-center justify-end gap-1.5">
+                        <button
+                          phx-click="rescore-route"
+                          phx-value-route-id={route.id}
+                          class="text-[10px] px-2 py-1 rounded bg-base-300 hover:bg-base-content/10 text-base-content/35 hover:text-base-content transition-all"
+                        >
+                          Rescore
+                        </button>
+                        <button
+                          phx-click="mark-reviewed"
+                          phx-value-route-id={route.id}
+                          class="text-[10px] px-2 py-1 rounded bg-base-300 hover:bg-base-content/10 text-base-content/50 hover:text-base-content transition-all"
+                        >
+                          Mark reviewed
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      <% end %>
+
+      <%!-- Search Analytics — demand-led expansion surface --%>
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium">Search Analytics · Last 30 days</h2>
+          <span class="text-xs text-base-content/35 tabular-nums"><%= @analytics.search_count_30d %> searches</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          <%!-- Top searched pairs --%>
+          <div class="rounded-xl border border-base-300 overflow-hidden">
+            <div class="px-4 py-2.5 bg-base-200 border-b border-base-300">
+              <p class="text-[10px] text-base-content/40 uppercase tracking-widest font-medium">Top searched pairs</p>
+            </div>
+            <%= if @analytics.top_pairs == [] do %>
+              <p class="px-4 py-3 text-xs text-base-content/25">No data yet</p>
+            <% else %>
+              <ul class="divide-y divide-base-300">
+                <%= for {origin, destination, count} <- @analytics.top_pairs do %>
+                  <li class="px-4 py-2 flex items-center justify-between">
+                    <span class="text-xs text-base-content/65"><%= origin %> → <%= destination %></span>
+                    <span class="text-xs font-semibold text-base-content/50 tabular-nums ml-3"><%= count %></span>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
+          </div>
+
+          <%!-- Direct uncovered searches — raw demand signal from not-covered page visits --%>
+          <div class="rounded-xl border overflow-hidden" style="border-color: rgba(251, 191, 36, 0.25)">
+            <div class="px-4 py-2.5 border-b" style="background: rgba(251, 191, 36, 0.05); border-color: rgba(251, 191, 36, 0.15)">
+              <p class="text-[10px] text-amber-400/70 uppercase tracking-widest font-medium">Direct gap searches — users who hit not-covered</p>
+            </div>
+            <%= if @analytics.direct_uncovered == [] do %>
+              <p class="px-4 py-3 text-xs text-base-content/25">No direct gap searches yet</p>
+            <% else %>
+              <ul class="divide-y divide-base-300">
+                <%= for {origin, destination, count} <- @analytics.direct_uncovered do %>
+                  <li class="px-4 py-2 flex items-center justify-between">
+                    <span class="text-xs text-amber-400/75"><%= origin %> → <%= destination %></span>
+                    <span class="text-xs font-semibold text-amber-400/55 tabular-nums ml-3"><%= count %></span>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
+          </div>
+
+          <%!-- Top origins --%>
+          <div class="rounded-xl border border-base-300 overflow-hidden">
+            <div class="px-4 py-2.5 bg-base-200 border-b border-base-300">
+              <p class="text-[10px] text-base-content/40 uppercase tracking-widest font-medium">Top origins</p>
+            </div>
+            <%= if @analytics.top_origins == [] do %>
+              <p class="px-4 py-3 text-xs text-base-content/25">No data yet</p>
+            <% else %>
+              <ul class="divide-y divide-base-300">
+                <%= for {origin, count} <- @analytics.top_origins do %>
+                  <li class="px-4 py-2 flex items-center justify-between">
+                    <span class="text-xs text-base-content/65"><%= origin %></span>
+                    <span class="text-xs font-semibold text-base-content/50 tabular-nums ml-3"><%= count %></span>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
+          </div>
+
+          <%!-- Top destinations --%>
+          <div class="rounded-xl border border-base-300 overflow-hidden">
+            <div class="px-4 py-2.5 bg-base-200 border-b border-base-300">
+              <p class="text-[10px] text-base-content/40 uppercase tracking-widest font-medium">Top destinations</p>
+            </div>
+            <%= if @analytics.top_destinations == [] do %>
+              <p class="px-4 py-3 text-xs text-base-content/25">No data yet</p>
+            <% else %>
+              <ul class="divide-y divide-base-300">
+                <%= for {destination, count} <- @analytics.top_destinations do %>
+                  <li class="px-4 py-2 flex items-center justify-between">
+                    <span class="text-xs text-base-content/65"><%= destination %></span>
+                    <span class="text-xs font-semibold text-base-content/50 tabular-nums ml-3"><%= count %></span>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
+          </div>
+
+        </div>
+      </section>
+
+      <%!-- ── EXPANSION PRIORITY — merged ranked table for coverage decisions ─── --%>
+      <%!-- Combines direct gap searches (2× weight) + inferred uncovered searches. --%>
+      <%!-- This is the single table to consult when deciding which routes to seed next. --%>
+      <section>
+        <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-1">Route Expansion Priority</h2>
+        <p class="text-[10px] text-base-content/25 mb-3">
+          Pairs ranked by combined demand signal. Direct = user landed on not-covered page (2× weight). Inferred = submitted search, no routes found.
+        </p>
+        <div class="rounded-xl border border-base-300 overflow-hidden">
+          <%= if @analytics.expansion_priority == [] do %>
+            <p class="px-4 py-4 text-xs text-base-content/25">No uncovered searches yet.</p>
+          <% else %>
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-base-300 bg-base-200">
+                  <th class="text-left px-4 py-2 text-base-content/35 font-medium">#</th>
+                  <th class="text-left px-4 py-2 text-base-content/35 font-medium">Pair</th>
+                  <th class="text-left px-4 py-2 text-base-content/35 font-medium">Direct</th>
+                  <th class="text-left px-4 py-2 text-base-content/35 font-medium">Inferred</th>
+                  <th class="text-left px-4 py-2 text-base-content/35 font-medium">Score</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-base-300">
+                <%= for {{origin, destination, direct_count, inferred_count, total}, idx} <- Enum.with_index(@analytics.expansion_priority, 1) do %>
+                  <tr class="hover:bg-base-200/40">
+                    <td class="px-4 py-2 text-base-content/25"><%= idx %></td>
+                    <td class="px-4 py-2 font-medium text-base-content/75">
+                      <%= origin %> → <%= destination %>
+                    </td>
+                    <td class="px-4 py-2">
+                      <%= if direct_count > 0 do %>
+                        <span class="text-amber-400/70 font-medium"><%= direct_count %></span>
+                      <% else %>
+                        <span class="text-base-content/20">—</span>
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-2 text-base-content/40"><%= if inferred_count > 0, do: inferred_count, else: "—" %></td>
+                    <td class="px-4 py-2 text-base-content/55 font-semibold tabular-nums"><%= total %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          <% end %>
+        </div>
+      </section>
+
+      <%!-- ── DEV TOOLS: Freshness Testing ──────────────────────────────────── --%>
+      <%!-- Force any route to any freshness state without SQL.                   --%>
+      <%!-- Use this to verify UI behaviour for aging/stale/review_required paths --%>
+      <section>
+        <h2 class="text-xs text-base-content/30 uppercase tracking-widest font-medium mb-1">Dev Tools · Freshness Testing</h2>
+        <p class="text-[10px] text-base-content/25 mb-3">
+          Force routes to specific freshness states to verify UI behaviour. Changes are immediate.
+          Use "Run freshness job" (nav) to recompute from <code>last_reviewed_at</code> after testing.
+        </p>
+        <div class="rounded-xl border border-base-300 overflow-hidden">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-base-300 bg-base-200">
+                <th class="text-left px-4 py-2 text-base-content/35 font-medium">Route</th>
+                <th class="text-left px-4 py-2 text-base-content/35 font-medium">Pair</th>
+                <th class="text-left px-4 py-2 text-base-content/35 font-medium">Current state</th>
+                <th class="text-left px-4 py-2 text-base-content/35 font-medium">Force to →</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-base-300">
+              <%= for route <- @dev_routes do %>
+                <tr class="hover:bg-base-200/40">
+                  <td class="px-4 py-2.5 font-medium text-base-content/70">
+                    <.link navigate={~p"/routes/#{route.id}"} class="hover:text-base-content transition-colors">
+                      <%= route.route_name %>
+                    </.link>
+                  </td>
+                  <td class="px-4 py-2.5 text-base-content/40">
+                    <%= route.origin_city.name %> → <%= route.destination_city.name %>
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <span class={"text-[10px] font-medium px-1.5 py-0.5 rounded-full border #{freshness_badge_class(route.score.freshness_state)}"}>
+                      <%= freshness_label(route.score.freshness_state) %>
+                    </span>
+                  </td>
+                  <td class="px-4 py-2.5">
+                    <div class="flex items-center gap-1">
+                      <%= for {label, state, cls} <- [
+                        {"Current",  "current",         "text-emerald-400/60 border-emerald-400/20 hover:bg-emerald-400/10"},
+                        {"Aging",    "aging",            "text-amber-400/60 border-amber-400/20 hover:bg-amber-400/10"},
+                        {"Stale",    "stale",            "text-orange-400/60 border-orange-400/20 hover:bg-orange-400/10"},
+                        {"Rev req",  "review_required",  "text-red-400/60 border-red-400/20 hover:bg-red-400/10"}
+                      ] do %>
+                        <button
+                          phx-click="force-freshness"
+                          phx-value-route-id={route.id}
+                          phx-value-state={state}
+                          class={"text-[10px] px-2 py-0.5 rounded-full border transition-all " <>
+                            if route.score.freshness_state == state,
+                              do: "bg-primary/15 border-primary/30 text-primary/80 font-medium",
+                              else: cls}
+                        >
+                          <%= label %>
+                        </button>
+                      <% end %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+          <%= if Enum.empty?(@dev_routes) do %>
+            <div class="px-4 py-4 text-center text-xs text-base-content/25">
+              No active routes found. Run <code class="text-base-content/50">mix run priv/repo/seeds.exs</code> to seed routes.
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <p class="text-[10px] text-base-content/20 text-center pb-4">
+        Advisory check runs every 6 hours · Freshness recomputed daily · Admin auth via ADMIN_PASS env var
+      </p>
+    </div>
+  </div>
+</div>

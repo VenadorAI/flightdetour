@@ -1,0 +1,814 @@
+<div class="h-screen flex flex-col bg-base-100 overflow-hidden" data-theme="dark">
+  <.flash kind={:info} flash={@flash} />
+  <.flash kind={:error} flash={@flash} />
+
+  <%!-- Navigation --%>
+  <nav class="px-5 py-3 flex items-center gap-2 sm:gap-4 border-b border-base-300 shrink-0 min-w-0">
+    <.link navigate={~p"/"} class="text-base-content/50 hover:text-base-content transition-colors shrink-0">
+      <span class="text-lg font-semibold tracking-tight">FlightDetour</span>
+    </.link>
+    <%= if @origin_city && @destination_city do %>
+      <span class="text-base-content/25 shrink-0">›</span>
+      <%!-- Pair heading is itself a tap target to edit the search.
+           "✎ edit" label makes the affordance discoverable on mobile. --%>
+      <.link
+        navigate={"/?from=#{URI.encode(@origin_city.name)}&to=#{URI.encode(@destination_city.name)}"}
+        class="flex items-center gap-1.5 min-w-0 group"
+      >
+        <span class="text-base-content/85 font-medium truncate text-sm sm:text-base group-hover:text-base-content transition-colors">
+          <%= @origin_city.name %> → <%= @destination_city.name %>
+        </span>
+        <span class="shrink-0 text-[10px] text-base-content/25 group-hover:text-base-content/55 transition-colors hidden sm:inline">✎</span>
+      </.link>
+    <% end %>
+    <div class="ml-auto shrink-0">
+      <.link
+        navigate={if @origin_city && @destination_city,
+          do: "/?from=#{URI.encode(@origin_city.name)}&to=#{URI.encode(@destination_city.name)}",
+          else: "/"}
+        class="text-xs px-2.5 py-1.5 rounded-lg bg-base-200 border border-base-300 text-base-content/50 hover:text-base-content/75 hover:border-base-content/20 transition-all"
+      >
+        Edit search
+      </.link>
+    </div>
+  </nav>
+
+  <%!-- sr-only H1 for crawlers — visible heading is in the nav breadcrumb --%>
+  <%= if @origin_city && @destination_city do %>
+    <h1 class="sr-only"><%= @origin_city.name %> → <%= @destination_city.name %> — Route Disruption Assessment</h1>
+  <% end %>
+
+  <%= if @not_covered do %>
+    <%!-- Not covered state --%>
+    <div class="flex-1 overflow-y-auto px-6 py-10">
+      <div class="max-w-sm mx-auto">
+        <div class="text-center mb-6">
+          <h2 class="text-lg font-semibold text-base-content mb-2">
+            <%= if @origin_city && @destination_city,
+              do: "#{@origin_city.name} → #{@destination_city.name}",
+              else: "Route" %> isn't covered yet
+          </h2>
+          <p class="text-base-content/50 text-sm leading-relaxed mb-3">
+            This route isn't in FlightDetour's coverage yet.
+            We focus on long-haul corridors where airspace routing choices — via Gulf, Central Asia, or Southeast Asia — create meaningful differences between options.
+          </p>
+          <%!-- Demand signal confirmation --%>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-base-200 border border-base-300 mb-5">
+            <div class="w-1.5 h-1.5 rounded-full bg-emerald-400/60 shrink-0"></div>
+            <span class="text-[11px] text-base-content/45">Search noted — we use this to prioritise new routes</span>
+          </div>
+          <.link navigate={~p"/"} class="btn btn-outline btn-sm w-full mb-5">Search a different route</.link>
+        </div>
+
+        <%!-- Nearby covered suggestions --%>
+        <%= if length(@nearby_from_origin) > 0 || length(@nearby_to_destination) > 0 do %>
+          <div class="space-y-4">
+            <%= if length(@nearby_from_origin) > 0 && @origin_city do %>
+              <div>
+                <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-2">
+                  Other covered routes from <%= @origin_city.name %>
+                </p>
+                <div class="flex flex-col gap-1">
+                  <%= for %{city_name: dest_name, score: score} <- @nearby_from_origin do %>
+                    <% slug = Pathfinder.CitySlug.pair_slug(@origin_city.name, dest_name) %>
+                    <.link
+                      navigate={~p"/route/#{slug}"}
+                      class="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
+                    >
+                      <span class="flex-1 text-sm text-base-content/65 group-hover:text-base-content/85 truncate">
+                        <%= @origin_city.name %> → <%= dest_name %>
+                      </span>
+                      <%= if score do %>
+                        <span class={"shrink-0 text-xs font-semibold tabular-nums #{Pathfinder.Routes.RouteScore.label_color(score.label)}"}>
+                          <%= score.composite_score %>
+                        </span>
+                      <% end %>
+                      <span class="text-base-content/30 text-xs group-hover:text-base-content/50 shrink-0">→</span>
+                    </.link>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+
+            <%= if length(@nearby_to_destination) > 0 && @destination_city do %>
+              <div>
+                <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-2">
+                  Covered origins flying to <%= @destination_city.name %>
+                </p>
+                <div class="flex flex-col gap-1">
+                  <%= for %{city_name: origin_name, score: score} <- @nearby_to_destination do %>
+                    <% slug = Pathfinder.CitySlug.pair_slug(origin_name, @destination_city.name) %>
+                    <.link
+                      navigate={~p"/route/#{slug}"}
+                      class="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
+                    >
+                      <span class="flex-1 text-sm text-base-content/65 group-hover:text-base-content/85 truncate">
+                        <%= origin_name %> → <%= @destination_city.name %>
+                      </span>
+                      <%= if score do %>
+                        <span class={"shrink-0 text-xs font-semibold tabular-nums #{Pathfinder.Routes.RouteScore.label_color(score.label)}"}>
+                          <%= score.composite_score %>
+                        </span>
+                      <% end %>
+                      <span class="text-base-content/30 text-xs group-hover:text-base-content/50 shrink-0">→</span>
+                    </.link>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- Fallback: featured routes when no suggestions available --%>
+        <%= if length(@nearby_from_origin) == 0 && length(@nearby_to_destination) == 0 && length(@featured_pairs) > 0 do %>
+          <div>
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-2">
+              Covered routes you can check now
+            </p>
+            <div class="flex flex-col gap-1">
+              <%= for %{origin: o, destination: d} <- @featured_pairs do %>
+                <% slug = Pathfinder.CitySlug.pair_slug(o, d) %>
+                <.link
+                  navigate={~p"/route/#{slug}"}
+                  class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
+                >
+                  <span class="text-sm text-base-content/65 group-hover:text-base-content/85">
+                    <%= o %> → <%= d %>
+                  </span>
+                  <span class="text-base-content/30 text-xs group-hover:text-base-content/50">→</span>
+                </.link>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="mt-6 text-center">
+          <.link navigate={~p"/how-it-works"} class="text-xs text-base-content/25 hover:text-base-content/45 transition-colors">
+            What FlightDetour covers →
+          </.link>
+        </div>
+      </div>
+    </div>
+  <% else %>
+    <%!-- Mobile: cards first (order-first), map below (order-last).              --%>
+    <%!-- Desktop (md:flex-row): map left (md:order-first), cards right.          --%>
+    <div class="flex-1 min-h-0 flex flex-col md:flex-row">
+
+      <%!-- Map panel — below cards on mobile, left panel on desktop --%>
+      <div class="order-last md:order-first h-[32vh] md:h-full md:w-[46%] shrink-0 flex flex-col relative border-t md:border-t-0 border-base-300">
+        <%= if length(@routes) > 0 do %>
+          <div class="absolute bottom-3 left-3 z-20 pointer-events-none">
+            <span class="inline-flex items-center px-2 py-1 rounded-md bg-base-100/80 backdrop-blur-sm text-xs text-base-content/45">
+              <%= length(@routes) %> routes
+            </span>
+          </div>
+        <% end %>
+        <div
+          id="route-map"
+          phx-hook="MapHook"
+          phx-update="ignore"
+          class="flex-1 min-h-0 relative"
+        >
+          <div
+            id="map-skeleton"
+            class="absolute inset-0 bg-base-200 flex items-center justify-center z-10 pointer-events-none transition-opacity duration-500"
+          >
+            <div class="flex flex-col items-center gap-3 opacity-30">
+              <div class="w-8 h-8 border-2 border-base-content/30 border-t-base-content/70 rounded-full animate-spin"></div>
+              <span class="text-xs text-base-content/50 tracking-wider uppercase">Loading map</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <%!-- Cards panel — scrollable, appears first on mobile --%>
+      <div class="order-first md:order-last flex-1 min-h-0 overflow-y-auto md:border-l border-base-300" id="results-scroll-container">
+        <div class="px-4 py-4 max-w-xl mx-auto md:max-w-none md:px-5">
+
+          <%!-- Pair verdict — crawlable synthesized summary, unique per corridor state --%>
+          <% verdict = PathfinderWeb.ResultsLive.pair_verdict(@routes, @best_route) %>
+          <%= if verdict do %>
+            <p class="text-sm text-base-content/55 leading-relaxed mb-3">
+              <%= verdict %>
+            </p>
+          <% end %>
+
+          <%!-- ── BEST ROUTE SUMMARY BLOCK ───────────────────────────────────── --%>
+          <%!-- Primary conversion surface. Shows recommendation, 3 signal labels,  --%>
+          <%!-- and 3 actions. Freshness warning overrides optimistic copy.          --%>
+          <%= if @best_route && @best_route.score do %>
+            <% best_freshness = Pathfinder.Advisory.Freshness.for_score(@best_route.score) %>
+            <% best_iata_o = hd(@best_route.origin_city.iata_codes || [""]) %>
+            <% best_iata_d = hd(@best_route.destination_city.iata_codes || [""]) %>
+            <% best_sky = Enum.find(Pathfinder.Outbound.search_links(best_iata_o, best_iata_d), fn {k, _, _} -> k == :skyscanner end) %>
+            <% {{exposure_label, exposure_color}, detour_label, hub_label} = PathfinderWeb.ResultsLive.summary_labels(@best_route.score) %>
+            <% explanation = PathfinderWeb.ResultsLive.summary_explanation(@best_route, @routes) %>
+
+            <% freshness_warning =
+              case best_freshness do
+                :review_required -> Pathfinder.Advisory.Freshness.description(:review_required)
+                :stale           -> Pathfinder.Advisory.Freshness.description(:stale)
+                _                -> nil
+              end %>
+
+            <div class={"mb-3 rounded-xl border px-3.5 py-3.5 " <>
+              case best_freshness do
+                :review_required -> "bg-amber-400/5 border-amber-400/20"
+                :stale           -> "bg-orange-400/5 border-orange-400/15"
+                _                -> "bg-base-200 border-base-300"
+              end}>
+
+              <%!-- Title row --%>
+              <div class="flex items-center justify-between gap-2 mb-2.5">
+                <span class="text-[10px] text-base-content/35 uppercase tracking-widest font-medium">Best detour right now</span>
+                <div class={"shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold #{RouteScore.label_bg(@best_route.score.label)}"}>
+                  <div class={"w-1.5 h-1.5 rounded-full shrink-0 #{RouteScore.label_dot(@best_route.score.label)}"}></div>
+                  <span class={RouteScore.label_color(@best_route.score.label)}><%= RouteScore.label_text(@best_route.score.label) %></span>
+                  <span class="text-base-content/45 tabular-nums"><%= @best_route.score.composite_score %></span>
+                </div>
+              </div>
+
+              <%!-- Explanation — freshness warning overrides when stale/pending --%>
+              <%= if freshness_warning do %>
+                <p class={"text-sm font-medium leading-snug mb-2.5 " <>
+                  if(best_freshness == :review_required, do: "text-amber-400/85", else: "text-orange-400/75")}>
+                  <%= freshness_warning %>
+                </p>
+              <% else %>
+                <p class="text-sm font-medium text-base-content/80 leading-snug mb-2.5">
+                  <%= explanation %>
+                </p>
+              <% end %>
+
+              <%!-- 3 signal labels: Exposure · Detour impact · Hub reliability --%>
+              <div class="flex items-center gap-3 flex-wrap mb-3">
+                <div class="flex items-center gap-1">
+                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Exposure</span>
+                  <span class={"text-[11px] font-semibold #{exposure_color}"}><%= exposure_label %></span>
+                </div>
+                <span class="text-base-content/15 text-xs">·</span>
+                <div class="flex items-center gap-1">
+                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Detour</span>
+                  <span class="text-[11px] font-semibold text-base-content/55"><%= detour_label %></span>
+                </div>
+                <span class="text-base-content/15 text-xs">·</span>
+                <div class="flex items-center gap-1">
+                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Hub</span>
+                  <span class="text-[11px] font-semibold text-base-content/55"><%= hub_label %></span>
+                </div>
+              </div>
+
+              <%!-- CTAs --%>
+              <div class="flex flex-col gap-2">
+                <%!-- Primary: Skyscanner --%>
+                <%= if best_sky do %>
+                  <% {bsk, bsl, _} = best_sky %>
+                  <a
+                    href={"/go?provider=#{bsk}&o=#{best_iata_o}&d=#{best_iata_d}&pair=#{@pair_slug}&route_id=#{@best_route.id}"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="flex items-center justify-center gap-1.5 w-full rounded-lg bg-base-content/25 border border-base-content/35 px-3 py-3 text-sm font-semibold text-base-content hover:bg-base-content/30 hover:border-base-content/45 active:scale-[0.98] transition-all"
+                  >
+                    Check flights on <%= bsl %> ↗
+                  </a>
+                <% end %>
+                <%!-- Secondary row: View route details + Show on map --%>
+                <div class="flex gap-2">
+                  <.link
+                    navigate={~p"/routes/#{@best_route.id}"}
+                    class={"flex-1 flex items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-xs font-semibold transition-all " <>
+                      case @best_route.score.label do
+                        :flowing     -> "bg-emerald-400/8 border border-emerald-400/20 text-emerald-400/80 hover:bg-emerald-400/12"
+                        :watchful    -> "bg-amber-400/8 border border-amber-400/20 text-amber-400/75 hover:bg-amber-400/12"
+                        :constrained -> "bg-orange-400/8 border border-orange-400/15 text-orange-400/70 hover:bg-orange-400/12"
+                        :strained    -> "bg-red-400/8 border border-red-400/15 text-red-400/65 hover:bg-red-400/12"
+                      end}
+                  >
+                    View route details →
+                  </.link>
+                  <button
+                    phx-click="select-route"
+                    phx-value-id={@best_route.id}
+                    class="flex items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-xs font-medium bg-base-300/60 border border-base-content/10 text-base-content/45 hover:text-base-content/65 hover:border-base-content/20 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    Show on map
+                  </button>
+                </div>
+              </div>
+
+              <%!-- Source context footnote --%>
+              <% source_ctx = Pathfinder.Advisory.Freshness.source_context(best_freshness, @latest_source_check) %>
+              <%= if source_ctx && !freshness_warning do %>
+                <p class="text-[10px] text-emerald-400/50 mt-2"><%= source_ctx %></p>
+              <% else %>
+                <%= if label = Pathfinder.Advisory.Freshness.source_check_label(@latest_source_check) do %>
+                  <p class="text-[10px] text-base-content/20 mt-2"><%= label %></p>
+                <% end %>
+              <% end %>
+
+              <%= unless @sufficient_coverage do %>
+                <p class="text-[10px] text-amber-400/55 mt-1">Limited coverage — fewer corridor options than usual.</p>
+              <% end %>
+
+              <%!-- Share — below all CTAs, at the point users want to send this to someone --%>
+              <div class="border-t border-base-content/8 pt-3 flex justify-center">
+                <button
+                  id="share-comparison-btn"
+                  phx-hook="CopyRouteLink"
+                  data-url={@page_canonical}
+                  data-text={"#{@origin_city.name} → #{@destination_city.name}: #{explanation}"}
+                  data-share-title={"FlightDetour: #{@origin_city.name} → #{@destination_city.name}"}
+                  class="text-xs text-base-content/40 hover:text-base-content/65 transition-colors flex items-center gap-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  <span data-share-label>Share this comparison</span>
+                </button>
+              </div>
+            </div>
+          <% end %>
+
+          <%!-- Compare toggle — only when 2+ routes --%>
+          <%= if length(@routes) >= 2 do %>
+            <div class="flex items-center justify-end mb-2">
+              <button
+                phx-click="toggle-compare"
+                class={"text-[10px] font-medium transition-colors px-2 py-1 rounded " <>
+                  if(@show_compare,
+                    do: "text-base-content/70 bg-base-content/10",
+                    else: "text-base-content/35 hover:text-base-content/60")}
+              >
+                <%= if @show_compare, do: "✕ Close compare", else: "⇄ Compare routes" %>
+              </button>
+            </div>
+          <% end %>
+
+          <%!-- ── COMPARE VIEW ────────────────────────────────────────────────── --%>
+          <%= if @show_compare && length(@routes) >= 2 do %>
+            <% compare_routes = Enum.take(@routes, 3) |> Enum.filter(& &1.score) %>
+            <% col_count = length(compare_routes) %>
+            <div class={"mb-3 rounded-xl border border-base-300 overflow-x-auto"}>
+              <%!-- Column headers: route names --%>
+              <div class={"grid border-b border-base-300 bg-base-200 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/25 uppercase tracking-widest"></div>
+                <%= for r <- compare_routes do %>
+                  <div class="px-3 py-2 border-l border-base-300">
+                    <div class="flex items-center gap-1 mb-0.5">
+                      <div class={"w-1.5 h-1.5 rounded-full shrink-0 #{RouteScore.label_dot(r.score.label)}"}></div>
+                      <span class="text-xs font-semibold text-base-content/85 leading-tight truncate"><%= r.route_name %></span>
+                      <%= if @best_route && r.id == @best_route.id do %>
+                        <span class="text-[9px] font-semibold text-base-content/40 shrink-0">★</span>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Score --%>
+              <div class={"grid border-b border-base-300/60 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Score</div>
+                <%= for r <- compare_routes do %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <span class={"text-xs font-bold tabular-nums #{RouteScore.label_color(r.score.label)}"}><%= r.score.composite_score %></span>
+                    <span class="text-[10px] text-base-content/35 ml-1"><%= RouteScore.label_text(r.score.label) %></span>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Airspace --%>
+              <div class={"grid border-b border-base-300/60 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Airspace</div>
+                <%= for r <- compare_routes do %>
+                  <% {_pill_bg, pill_text, short_label} =
+                    case r.score.airspace_score do
+                      0 -> {"", "text-emerald-400/80", "Clean"}
+                      1 -> {"", "text-base-content/50", "Near zone"}
+                      2 -> {"", "text-amber-400/75", "Advisory"}
+                      _ -> {"", "text-red-400/65", "Conflict"}
+                    end %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <span class={"text-xs font-medium #{pill_text}"}><%= short_label %></span>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Fallback (corridor score — inverted: 0=best) --%>
+              <div class={"grid border-b border-base-300/60 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Fallback</div>
+                <%= for r <- compare_routes do %>
+                  <% fallback_label = case r.score.corridor_score do
+                    0 -> {"Many options", "text-emerald-400/70"}
+                    1 -> {"Some options", "text-base-content/55"}
+                    2 -> {"Few options",  "text-amber-400/70"}
+                    _ -> {"Single path",  "text-orange-400/65"}
+                  end %>
+                  <% {fb_text, fb_color} = fallback_label %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <span class={"text-xs #{fb_color}"}><%= fb_text %></span>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Duration --%>
+              <div class={"grid border-b border-base-300/60 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Duration</div>
+                <%= for r <- compare_routes do %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <%= if r.typical_duration_minutes do %>
+                      <span class="text-xs text-base-content/55">
+                        <%= div(r.typical_duration_minutes, 60) %>h<%= if rem(r.typical_duration_minutes, 60) > 0, do: " #{rem(r.typical_duration_minutes, 60)}m" %>
+                      </span>
+                    <% else %>
+                      <span class="text-xs text-base-content/25">—</span>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Current pressure (pressure_score — higher is better) --%>
+              <div class={"grid border-b border-base-300/60 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Pressure</div>
+                <%= for r <- compare_routes do %>
+                  <% {p_label, p_color} = cond do
+                    r.score.pressure_score >= 80 -> {"Low",    "text-emerald-400/70"}
+                    r.score.pressure_score >= 60 -> {"Moderate","text-base-content/55"}
+                    r.score.pressure_score >= 40 -> {"Elevated","text-amber-400/65"}
+                    true                         -> {"High",   "text-orange-400/65"}
+                  end %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <span class={"text-xs #{p_color}"}><%= p_label %></span>
+                    <span class="text-[10px] text-base-content/25 ml-1 tabular-nums"><%= r.score.pressure_score %></span>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Best for (truncated recommendation) --%>
+              <div class={"grid border-b border-base-300/60 " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Best for</div>
+                <%= for r <- compare_routes do %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <p class="text-[10px] text-base-content/50 leading-relaxed line-clamp-2">
+                      <%= r.score.recommendation_text || "—" %>
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Row: Watch --%>
+              <div class={"grid " <>
+                if(col_count == 3, do: "grid-cols-4", else: "grid-cols-3")}>
+                <div class="px-3 py-2 text-[10px] text-base-content/35 font-medium">Watch</div>
+                <%= for r <- compare_routes do %>
+                  <div class="px-3 py-2 border-l border-base-300/40">
+                    <p class="text-[10px] text-amber-400/55 leading-relaxed line-clamp-2">
+                      <%= r.score.watch_for || "—" %>
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+
+          <%!-- Route cards — top 3 shown by default, expandable --%>
+          <% visible_routes = if @show_all_routes, do: @routes, else: Enum.take(@routes, 3) %>
+          <div class="flex flex-col gap-2" id="route-cards">
+            <%= for route <- visible_routes do %>
+              <%= if route.score do %>
+
+                <%!-- Per-card computed state --%>
+                <% {airspace_pill_text, airspace_short_label} =
+                  case route.score.airspace_score do
+                    0 -> {"text-emerald-400/80", "Clean"}
+                    1 -> {"text-base-content/40", "Near zone"}
+                    2 -> {"text-amber-400/80", "Advisory"}
+                    _ -> {"text-red-400/70", "Conflict"}
+                  end %>
+
+                <%!-- Best-route card gets a status-tinted border to distinguish it visually --%>
+                <% is_best = @best_route != nil && route.id == @best_route.id %>
+                <% {card_selected_cls, card_default_cls} =
+                  case {is_best, route.score.label} do
+                    {true, :flowing}     -> {"border-emerald-400/40 ring-1 ring-emerald-400/15", "border-emerald-400/20 hover:border-emerald-400/35"}
+                    {true, :watchful}    -> {"border-amber-400/40 ring-1 ring-amber-400/15",     "border-amber-400/20 hover:border-amber-400/30"}
+                    {true, :constrained} -> {"border-orange-400/40 ring-1 ring-orange-400/15",   "border-orange-400/15 hover:border-orange-400/25"}
+                    {true, :strained}    -> {"border-red-400/35 ring-1 ring-red-400/12",         "border-red-400/12 hover:border-red-400/25"}
+                    _                    -> {"border-base-content/25 ring-1 ring-base-content/8","border-base-300 hover:border-base-content/20"}
+                  end %>
+                <%!-- "Full advisory" button tinted to route's advisory state --%>
+                <% advisory_btn_cls =
+                  case route.score.label do
+                    :flowing     -> "bg-emerald-400/10 border border-emerald-400/25 text-emerald-400/85 hover:bg-emerald-400/15 hover:text-emerald-400"
+                    :watchful    -> "bg-amber-400/10 border border-amber-400/25 text-amber-400/80 hover:bg-amber-400/15 hover:text-amber-400"
+                    :constrained -> "bg-orange-400/10 border border-orange-400/20 text-orange-400/75 hover:bg-orange-400/15 hover:text-orange-400"
+                    :strained    -> "bg-red-400/10 border border-red-400/20 text-red-400/70 hover:bg-red-400/15 hover:text-red-400"
+                  end %>
+
+                <div
+                  id={"route-card-#{route.id}"}
+                  phx-click="select-route"
+                  phx-value-id={route.id}
+                  class={"cursor-pointer rounded-2xl border transition-all duration-150 bg-base-200 " <>
+                    if selected?(route, @selected_route_id),
+                      do: card_selected_cls,
+                      else: card_default_cls}
+                >
+                  <%!-- Always-visible card body --%>
+                  <div class="p-3.5">
+
+                    <%!-- Row 1: Name + score badge --%>
+                    <div class="flex items-start justify-between gap-2.5 mb-1.5">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <h3 class="font-semibold text-base-content text-sm leading-snug truncate">
+                          <%= route.route_name %>
+                        </h3>
+                        <%= if is_best && length(@routes) > 1 do %>
+                          <% best_tag =
+                            cond do
+                              route.score.airspace_score == 0 &&
+                                Enum.any?(@routes, fn r -> r.id != route.id && r.score && r.score.airspace_score > 0 end) ->
+                                "Cleanest"
+                              true ->
+                                "Best"
+                            end %>
+                          <span class={"shrink-0 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border " <>
+                            case route.score.label do
+                              :flowing     -> "text-emerald-400/80 bg-emerald-400/10 border-emerald-400/25"
+                              :watchful    -> "text-amber-400/80 bg-amber-400/10 border-amber-400/25"
+                              :constrained -> "text-orange-400/75 bg-orange-400/10 border-orange-400/20"
+                              :strained    -> "text-red-400/70 bg-red-400/10 border-red-400/20"
+                            end}><%= best_tag %></span>
+                        <% end %>
+                      </div>
+                      <div class={"shrink-0 flex items-center gap-1 px-2 py-1 rounded-full border #{RouteScore.label_bg(route.score.label)}"}>
+                        <div class={"w-1.5 h-1.5 rounded-full #{RouteScore.label_dot(route.score.label)}"}></div>
+                        <span class={"text-xs font-medium #{RouteScore.label_color(route.score.label)}"}>
+                          <%= RouteScore.label_text(route.score.label) %>
+                        </span>
+                        <span class="text-xs text-base-content/40 tabular-nums"><%= route.score.composite_score %></span>
+                      </div>
+                    </div>
+
+                    <%!-- Row 2: Plain-language triptych — airspace · duration · fallback --%>
+                    <% fallback_text = case route.score.corridor_score do
+                      0 -> "Many options"
+                      1 -> "Some options"
+                      2 -> "Few options"
+                      _ -> "Single path"
+                    end %>
+                    <div class="flex items-center gap-1.5 mb-2 flex-wrap">
+                      <span class={"text-xs font-medium #{airspace_pill_text}"}><%= airspace_short_label %> airspace</span>
+                      <%= if route.typical_duration_minutes do %>
+                        <span class="text-base-content/20 text-xs">·</span>
+                        <span class="text-xs text-base-content/40">
+                          ~<%= div(route.typical_duration_minutes, 60) %>h<%= if rem(route.typical_duration_minutes, 60) > 0, do: " #{rem(route.typical_duration_minutes, 60)}m" %>
+                        </span>
+                      <% end %>
+                      <span class="text-base-content/20 text-xs">·</span>
+                      <span class="text-xs text-base-content/40"><%= fallback_text %></span>
+                    </div>
+
+                    <%!-- Score bar --%>
+                    <div class="w-full h-px bg-base-300 rounded-full overflow-hidden mb-2">
+                      <div
+                        class={"h-full rounded-full " <>
+                          case route.score.label do
+                            :flowing -> "bg-emerald-400"
+                            :watchful -> "bg-amber-400"
+                            :constrained -> "bg-orange-400"
+                            :strained -> "bg-red-400"
+                          end}
+                        style={"width: #{route.score.composite_score}%"}
+                      ></div>
+                    </div>
+
+                    <%!-- Best for — suppressed for stale/review_required to avoid contradicting freshness warnings --%>
+                    <% freshness = Pathfinder.Advisory.Freshness.for_score(route.score) %>
+                    <%= if route.score.recommendation_text && freshness not in [:stale, :review_required] do %>
+                      <p class="text-xs text-base-content/55 leading-relaxed line-clamp-2">
+                        <%= route.score.recommendation_text %>
+                      </p>
+                    <% end %>
+
+                    <%!-- Freshness chip + inline warning for non-current states --%>
+                    <%= if label = Pathfinder.Advisory.Freshness.label(freshness) do %>
+                      <div class="mt-1.5 space-y-1">
+                        <span class={"text-[10px] font-medium px-1.5 py-0.5 rounded-full border #{Pathfinder.Advisory.Freshness.chip_class(freshness)}"}>
+                          <%= label %>
+                        </span>
+                        <%= if freshness in [:review_required, :stale, :aging] do %>
+                          <p class={"text-[10px] leading-snug #{Pathfinder.Advisory.Freshness.description_color(freshness)}"}>
+                            <%= Pathfinder.Advisory.Freshness.description(freshness) %>
+                          </p>
+                        <% end %>
+                      </div>
+                    <% end %>
+
+                  </div>
+
+                  <%!-- Expanded section — shown for selected route --%>
+                  <%= if selected?(route, @selected_route_id) do %>
+                    <div class="border-t border-base-300 px-3.5 pb-3.5 pt-3 space-y-3">
+
+                      <%!-- Main weakness --%>
+                      <%= if weakness = Pathfinder.Scoring.main_weakness(route.score) do %>
+                        <div class="flex items-start gap-2">
+                          <span class="text-[10px] text-base-content/30 uppercase tracking-widest font-medium shrink-0 mt-0.5 w-16 pt-px">Weakness</span>
+                          <p class="text-xs text-base-content/50 leading-relaxed"><%= weakness %></p>
+                        </div>
+                      <% end %>
+
+                      <%!-- Watch --%>
+                      <%= if route.score.watch_for do %>
+                        <div class="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-400/8 border border-amber-400/20">
+                          <span class="text-amber-400/70 text-xs shrink-0 mt-px font-medium uppercase tracking-wide">Watch</span>
+                          <p class="text-xs text-base-content/60 leading-relaxed"><%= route.score.watch_for %></p>
+                        </div>
+                      <% end %>
+
+                      <%!-- Structural / Pressure mini-bars --%>
+                      <%= if route.score.structural_score && route.score.pressure_score do %>
+                        <div class="grid grid-cols-2 gap-2">
+                          <%= for {val, name} <- [{route.score.structural_score, "Structural"}, {route.score.pressure_score, "Pressure now"}] do %>
+                            <div class="bg-base-300/50 rounded-lg px-2.5 py-2">
+                              <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-base-content/40"><%= name %></span>
+                                <span class={"text-xs font-semibold tabular-nums #{RouteScore.layer_label_color(val)}"}><%= val %></span>
+                              </div>
+                              <div class="w-full h-px bg-base-content/10 rounded-full overflow-hidden">
+                                <div
+                                  class={"h-full rounded-full " <>
+                                    cond do
+                                      val >= 75 -> "bg-emerald-400"
+                                      val >= 56 -> "bg-amber-400"
+                                      val >= 38 -> "bg-orange-400"
+                                      true -> "bg-red-400"
+                                    end}
+                                  style={"width: #{val}%"}
+                                ></div>
+                              </div>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% end %>
+
+                      <%!-- Actions: understand first (primary), search second (secondary) --%>
+                      <% exp_iata_o = hd(route.origin_city.iata_codes || [""]) %>
+                      <% exp_iata_d = hd(route.destination_city.iata_codes || [""]) %>
+                      <% exp_links = Pathfinder.Outbound.search_links(exp_iata_o, exp_iata_d) %>
+                      <div class="border-t border-base-300/60 pt-3 space-y-2">
+                        <%!-- Primary: read full analysis — tinted to advisory state --%>
+                        <.link
+                          navigate={~p"/routes/#{route.id}"}
+                          class={"flex items-center justify-center gap-1.5 w-full rounded-lg px-3 py-2.5 text-xs font-semibold transition-all #{advisory_btn_cls}"}
+                        >
+                          Full analysis →
+                        </.link>
+                        <%!-- Skyscanner: found by key — never depends on provider list order --%>
+                        <% sky = Enum.find(exp_links, fn {k, _, _} -> k == :skyscanner end) %>
+                        <% sec_links = Enum.reject(exp_links, fn {k, _, _} -> k == :skyscanner end) %>
+                        <%= if sky do %>
+                          <% {sky_key, sky_label, _} = sky %>
+                          <a
+                            href={"/go?provider=#{sky_key}&o=#{exp_iata_o}&d=#{exp_iata_d}&pair=#{@pair_slug}&route_id=#{route.id}"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="flex items-center justify-center gap-1.5 w-full rounded-lg bg-base-content/25 border border-base-content/35 px-3 py-2.5 text-xs font-semibold text-base-content hover:bg-base-content/30 hover:border-base-content/45 transition-all"
+                          >
+                            Search on <%= sky_label %> ↗
+                          </a>
+                        <% end %>
+                        <%!-- All other providers (Google Flights etc): tertiary text only --%>
+                        <%= if length(sec_links) > 0 do %>
+                          <div class="flex items-center gap-3 justify-center flex-wrap pt-0.5">
+                            <%= for {provider_key, label, _url} <- sec_links do %>
+                              <a
+                                href={"/go?provider=#{provider_key}&o=#{exp_iata_o}&d=#{exp_iata_d}&pair=#{@pair_slug}&route_id=#{route.id}"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-[10px] text-base-content/25 hover:text-base-content/45 transition-colors"
+                              >
+                                or <%= label %> ↗
+                              </a>
+                            <% end %>
+                          </div>
+                        <% end %>
+                        <% card_freshness = Pathfinder.Advisory.Freshness.for_score(route.score) %>
+                        <% card_ctx = Pathfinder.Advisory.Freshness.source_context(card_freshness, @latest_source_check) %>
+                        <%= if card_ctx do %>
+                          <p class="text-[10px] text-emerald-400/50 text-center"><%= card_ctx %></p>
+                        <% else %>
+                          <%= if label = Pathfinder.Advisory.Freshness.route_review_label(route.last_reviewed_at) do %>
+                            <p class="text-[10px] text-base-content/25 text-center"><%= label %></p>
+                          <% end %>
+                        <% end %>
+                      </div>
+
+                    </div>
+                  <% end %>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+
+          <%!-- Show all corridors toggle (only when there are more than 3) --%>
+          <% hidden_route_count = length(@routes) - 3 %>
+          <%= if hidden_route_count > 0 do %>
+            <div class="mt-2 text-center">
+              <button
+                phx-click="toggle-show-all-routes"
+                class="text-xs text-base-content/35 hover:text-base-content/60 transition-colors py-1"
+              >
+                <%= if @show_all_routes,
+                  do: "Show fewer corridors ↑",
+                  else: "+#{hidden_route_count} more #{if hidden_route_count == 1, do: "corridor", else: "corridors"} ↓" %>
+              </button>
+            </div>
+          <% end %>
+
+          <%!-- Active disruption zones --%>
+          <%= if length(@zones) > 0 do %>
+            <div class="mt-5 pt-4 border-t border-base-300">
+              <p class="text-xs text-base-content/25 uppercase tracking-widest mb-2">Active disruptions</p>
+              <div class="flex flex-wrap gap-1.5">
+                <%= for zone <- @zones do %>
+                  <.link
+                    navigate={~p"/disruption/#{zone.slug}"}
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-base-200 border border-base-300 text-xs text-base-content/45 hover:text-base-content/70 hover:border-base-content/25 transition-all"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" style={"background-color: #{zone.color}; opacity: 0.75;"}></span>
+                    <%= zone.name %>
+                  </.link>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+
+          <%!-- City hub internal links --%>
+          <%= if (@origin_city && @origin_city.slug) || (@destination_city && @destination_city.slug) do %>
+            <div class="mt-4 flex items-center justify-center gap-4 flex-wrap">
+              <%= if @origin_city && @origin_city.slug do %>
+                <.link
+                  navigate={~p"/from/#{@origin_city.slug}"}
+                  class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors"
+                >
+                  All routes from <%= @origin_city.name %> →
+                </.link>
+              <% end %>
+              <%= if @destination_city && @destination_city.slug do %>
+                <.link
+                  navigate={~p"/to/#{@destination_city.slug}"}
+                  class="text-xs text-base-content/30 hover:text-base-content/55 transition-colors"
+                >
+                  All routes to <%= @destination_city.name %> →
+                </.link>
+              <% end %>
+            </div>
+          <% end %>
+
+          <%!-- ── METHODOLOGY / TRUST BLOCK ─────────────────────────────────── --%>
+          <%!-- Native <details> — no LiveView state needed.                        --%>
+          <%!-- Answers "what is this based on?" without interrupting the flow.     --%>
+          <details class="mt-5 group">
+            <summary class="flex items-center justify-center gap-1.5 cursor-pointer list-none text-xs text-base-content/30 hover:text-base-content/55 transition-colors select-none">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+              How this is assessed
+            </summary>
+            <div class="mt-3 px-4 py-3 rounded-xl bg-base-200 border border-base-300 text-xs text-base-content/45 leading-relaxed space-y-1.5">
+              <p>
+                FlightDetour evaluates route options using advisory airspace exposure, corridor sensitivity, detour impact, and hub routing logic — based on publicly available EASA and national authority advisories.
+              </p>
+              <p class="text-base-content/30">
+                Coverage focuses on major long-haul corridors. Some routing patterns — including certain China-side connections via mainland Chinese hubs — are not yet included. If you expect an option here and don't see it, that's a coverage gap, not an assessment.
+              </p>
+              <p class="text-base-content/30">
+                Scores compare corridor quality; they do not predict airline operations or safety outcomes. Verify with your airline and government travel advisories before booking.
+              </p>
+              <.link navigate={~p"/how-it-works"} class="inline-block pt-0.5 text-base-content/35 hover:text-base-content/60 transition-colors">
+                Full methodology →
+              </.link>
+            </div>
+          </details>
+
+          <div class="mt-3 mb-2 flex justify-center">
+            <p class="text-[10px] text-base-content/20 text-center leading-relaxed max-w-xs">
+              Advisory data only · Verify before booking
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
