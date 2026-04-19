@@ -20,8 +20,8 @@
           Not every flight takes the same path.
         </h1>
         <p class="text-base-content/45 text-sm leading-relaxed">
-          Iran and Gulf closures have split long-haul routing into two tiers.
-          FlightDetour shows you which side your route is on — before you book.
+          Some flights to Asia and the Middle East are now longer, rerouted, or more exposed than others.
+          See which path still looks cleaner — before you book.
         </p>
       </div>
 
@@ -93,7 +93,7 @@
             phx-click="search"
             class="btn btn-primary w-full font-semibold mt-1 text-sm sm:text-base"
           >
-            Compare Corridors
+            Compare Routes
           </button>
         </div>
       </div>
@@ -102,7 +102,7 @@
       <div class="mt-4 flex items-center justify-center gap-3 sm:gap-5 flex-wrap">
         <div class="flex items-center gap-1.5">
           <div class="w-1.5 h-1.5 rounded-full bg-emerald-400/60 shrink-0"></div>
-          <span class="text-xs text-base-content/40"><%= @route_count %> corridors scored</span>
+          <span class="text-xs text-base-content/40"><%= @route_count %> routes tracked</span>
         </div>
         <div class="flex items-center gap-1.5">
           <div class="w-1.5 h-1.5 rounded-full bg-amber-400/60 shrink-0"></div>
@@ -121,7 +121,7 @@
       <%!-- Featured routes — pairs where the corridor choice creates meaningful advisory differences --%>
       <%= if length(@featured_pairs) > 0 do %>
         <div class="mt-6">
-          <p class="text-[10px] text-base-content/30 uppercase tracking-widest text-center mb-3">Routes where the corridor matters</p>
+          <p class="text-[10px] text-base-content/30 uppercase tracking-widest text-center mb-3">Routes people are comparing right now</p>
           <div class="flex flex-wrap gap-1.5 justify-center">
             <%= for pair <- @featured_pairs do %>
               <% slug = Pathfinder.CitySlug.pair_slug(pair.origin, pair.destination) %>

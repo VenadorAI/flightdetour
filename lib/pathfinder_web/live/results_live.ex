@@ -135,15 +135,14 @@ defmodule PathfinderWeb.ResultsLive do
 
     page_description =
       if best && best.score do
-        label_text = best.score.label |> Atom.to_string() |> String.capitalize()
-        "#{origin.name} → #{destination.name}: #{best.route_name} rates #{label_text} — #{length(routes)} corridor options compared by airspace exposure and advisory zone impact."
+        "Flights from #{origin.name} to #{destination.name} are not all the same right now. #{best.route_name} scores highest — compare #{length(routes)} routes and see which path still looks cleaner."
       else
-        "#{origin.name} → #{destination.name}: #{length(routes)} corridor options compared by airspace exposure and advisory zone impact."
+        "Compare routes from #{origin.name} to #{destination.name} — see which paths are rerouted, longer, or more exposed right now."
       end
 
     socket =
       socket
-      |> assign(:page_title, "#{origin.name} → #{destination.name} Route Comparison · FlightDetour")
+      |> assign(:page_title, "Flights from #{origin.name} to #{destination.name} — compare routes right now · FlightDetour")
       |> assign(:page_description, page_description)
       |> assign(:page_canonical, "#{base}/route/#{pair_slug}")
       |> assign(:structured_data, structured_data)

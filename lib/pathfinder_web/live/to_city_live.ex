@@ -30,9 +30,9 @@ defmodule PathfinderWeb.ToCityLive do
 
         description =
           if origins == [] do
-            "#{city.name} isn't covered as a destination yet on FlightDetour. Check routes departing from #{city.name}."
+            "We don't cover inbound flights to #{city.name} yet. Check how flights depart from #{city.name} and which routes are routing cleanly right now."
           else
-            "#{origin_count} covered #{if origin_count == 1, do: "origin", else: "origins"} with flights to #{city.name} — disruption status, airspace exposure, and advisory scoring for each inbound corridor. #{flowing_count} #{if flowing_count == 1, do: "route", else: "routes"} currently Flowing."
+            "Not every flight to #{city.name} takes the same path right now. #{origin_count} #{if origin_count == 1, do: "origin", else: "origins"} covered — compare which routes are rerouted, longer, or still clean. #{flowing_count} #{if flowing_count == 1, do: "route", else: "routes"} currently Flowing."
           end
 
         structured_data =
@@ -52,7 +52,7 @@ defmodule PathfinderWeb.ToCityLive do
 
         socket =
           socket
-          |> assign(:page_title, "Flights to #{city.name}: Airspace Risk by Route · FlightDetour")
+          |> assign(:page_title, "Flights to #{city.name} — compare which routes are cleaner right now · FlightDetour")
           |> assign(:page_description, description)
           |> assign(:page_canonical, "#{base}/to/#{city_slug}")
           |> assign(:structured_data, structured_data)

@@ -35,7 +35,7 @@
 
   <%!-- sr-only H1 for crawlers — visible heading is in the nav breadcrumb --%>
   <%= if @origin_city && @destination_city do %>
-    <h1 class="sr-only"><%= @origin_city.name %> → <%= @destination_city.name %> — Route Disruption Assessment</h1>
+    <h1 class="sr-only">Flights from <%= @origin_city.name %> to <%= @destination_city.name %> — compare routes right now</h1>
   <% end %>
 
   <%= if @not_covered do %>
@@ -49,8 +49,7 @@
               else: "Route" %> isn't covered yet
           </h2>
           <p class="text-base-content/50 text-sm leading-relaxed mb-3">
-            This route isn't in FlightDetour's coverage yet.
-            We focus on long-haul corridors where airspace routing choices — via Gulf, Central Asia, or Southeast Asia — create meaningful differences between options.
+            This route isn't covered yet — but many flights are currently rerouted or taking different paths. Try a nearby route to see how flight paths compare right now.
           </p>
           <%!-- Demand signal confirmation --%>
           <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-base-200 border border-base-300 mb-5">
@@ -93,7 +92,7 @@
             <%= if length(@nearby_to_destination) > 0 && @destination_city do %>
               <div>
                 <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-2">
-                  Covered origins flying to <%= @destination_city.name %>
+                  Other cities flying to <%= @destination_city.name %>
                 </p>
                 <div class="flex flex-col gap-1">
                   <%= for %{city_name: origin_name, score: score} <- @nearby_to_destination do %>
@@ -185,6 +184,13 @@
       <div class="order-first md:order-last flex-1 min-h-0 overflow-y-auto md:border-l border-base-300" id="results-scroll-container">
         <div class="px-4 py-4 max-w-xl mx-auto md:max-w-none md:px-5">
 
+          <%!-- SEO intro — search-intent framing before the verdict --%>
+          <%= if @origin_city && @destination_city do %>
+            <p class="text-xs text-base-content/35 leading-relaxed mb-2">
+              Not every flight from <%= @origin_city.name %> to <%= @destination_city.name %> takes the same path right now.
+            </p>
+          <% end %>
+
           <%!-- Pair verdict — crawlable synthesized summary, unique per corridor state --%>
           <% verdict = PathfinderWeb.ResultsLive.pair_verdict(@routes, @best_route) %>
           <%= if verdict do %>
@@ -220,7 +226,7 @@
 
               <%!-- Title row --%>
               <div class="flex items-center justify-between gap-2 mb-2.5">
-                <span class="text-[10px] text-base-content/35 uppercase tracking-widest font-medium">Best detour right now</span>
+                <span class="text-[10px] text-base-content/35 uppercase tracking-widest font-medium">Best option right now</span>
                 <div class={"shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold #{RouteScore.label_bg(@best_route.score.label)}"}>
                   <div class={"w-1.5 h-1.5 rounded-full shrink-0 #{RouteScore.label_dot(@best_route.score.label)}"}></div>
                   <span class={RouteScore.label_color(@best_route.score.label)}><%= RouteScore.label_text(@best_route.score.label) %></span>
@@ -243,17 +249,17 @@
               <%!-- 3 signal labels: Exposure · Detour impact · Hub reliability --%>
               <div class="flex items-center gap-3 flex-wrap mb-3">
                 <div class="flex items-center gap-1">
-                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Exposure</span>
+                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Airspace</span>
                   <span class={"text-[11px] font-semibold #{exposure_color}"}><%= exposure_label %></span>
                 </div>
                 <span class="text-base-content/15 text-xs">·</span>
                 <div class="flex items-center gap-1">
-                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Detour</span>
+                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Added distance</span>
                   <span class="text-[11px] font-semibold text-base-content/55"><%= detour_label %></span>
                 </div>
                 <span class="text-base-content/15 text-xs">·</span>
                 <div class="flex items-center gap-1">
-                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Hub</span>
+                  <span class="text-[10px] text-base-content/30 uppercase tracking-wider">Connection</span>
                   <span class="text-[11px] font-semibold text-base-content/55"><%= hub_label %></span>
                 </div>
               </div>

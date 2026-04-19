@@ -285,9 +285,9 @@ route = upsert_route.(%{
   distance_km: 12600, typical_duration_minutes: 890, is_active: true, last_reviewed_at: reviewed
 })
 upsert_score.(route, %{
-  airspace_score: 1, corridor_score: 2, hub_score: 0, complexity_score: 2, operational_score: 0,
+  airspace_score: 1, corridor_score: 2, hub_score: 0, complexity_score: 1, operational_score: 0,
   recommendation_text: "Gulf-free routing via Cathay's Hong Kong hub. Longer total journey but cleanest airspace profile of the three options.",
-  ranking_context: "Structural score (57) is lower than Istanbul (73) because HKG sits east of SIN, creating a genuine backtrack — Singapore is south of Hong Kong, so you overshoot slightly. Pressure score (77) matches Istanbul. Net composite lands in Watchful but at the lower end.",
+  ranking_context: "Structural score (57) is lower than Istanbul (67) because of the Central Asian corridor dependency and the northward overshoot past Singapore — the LHR–HKG–SIN routing adds roughly 16% vs the great-circle path. Pressure score (71) matches Istanbul exactly: both avoid the advisory zone on all legs. Net composite is Watchful, well clear of the Dubai option (Constrained) which crosses the active advisory zone.",
   watch_for: "LHR–HKG depends on the Central Asian corridor. If Eurocontrol issues flow restrictions before your flight, the first leg is the exposure point.",
   explanation_bullets: [
     "Both legs avoid the Middle East advisory zone entirely. LHR–HKG routes east via Central Asia; HKG–SIN routes south through South China Sea — a fully Gulf-free journey.",

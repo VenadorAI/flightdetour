@@ -25,8 +25,8 @@ defmodule PathfinderWeb.SearchLive do
 
     {:ok,
      socket
-     |> assign(:page_title, "FlightDetour · Flight Routing Intelligence")
-     |> assign(:page_description, "Iran and Gulf closures have split long-haul routing into two tiers. FlightDetour shows which side your route is on — airspace exposure, fallback options, routing risk.")
+     |> assign(:page_title, "FlightDetour — Compare rerouted long-haul flights before you book")
+     |> assign(:page_description, "Some flights to Asia and the Middle East are now longer, rerouted, or more exposed than others. See which route still looks cleaner before you book.")
      |> assign(:page_canonical, "#{base}/")
      |> assign(:structured_data, structured_data)
      |> assign(:origin, "")

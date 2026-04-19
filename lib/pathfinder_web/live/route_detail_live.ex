@@ -38,7 +38,7 @@ defmodule PathfinderWeb.RouteDetailLive do
 
     socket =
       socket
-      |> assign(:page_title, "#{route.origin_city.name} → #{route.destination_city.name} #{route.route_name} · FlightDetour")
+      |> assign(:page_title, "Flights from #{route.origin_city.name} to #{route.destination_city.name}: #{route.route_name} · FlightDetour")
       |> assign(:page_description, build_detail_description(route))
       |> assign(:page_canonical, "#{base}/routes/#{route.id}")
       |> assign(:structured_data, structured_data)
@@ -147,15 +147,15 @@ defmodule PathfinderWeb.RouteDetailLive do
       score = route.score.composite_score
 
       airspace = case route.score.airspace_score do
-        0 -> "Clean airspace."
-        1 -> "Near an advisory zone."
-        2 -> "Crosses an active advisory zone."
-        _ -> "High advisory zone exposure."
+        0 -> "Clean airspace, no rerouting concerns."
+        1 -> "Near an advisory zone but not through it."
+        2 -> "This route crosses an active airspace advisory zone."
+        _ -> "Route transits an active conflict zone."
       end
 
-      "#{route.origin_city.name} → #{route.destination_city.name} #{route.route_name}: #{label} (#{score}/100). #{airspace} Airspace exposure, corridor analysis, and booking advisory."
+      "#{route.route_name} from #{route.origin_city.name} to #{route.destination_city.name} — currently #{label} (#{score}/100). #{airspace} See if this is still the better option before you book."
     else
-      "#{route.origin_city.name} → #{route.destination_city.name} #{route.route_name} — detailed corridor assessment."
+      "#{route.route_name} from #{route.origin_city.name} to #{route.destination_city.name} — route details and how this path compares to alternatives right now."
     end
   end
 end

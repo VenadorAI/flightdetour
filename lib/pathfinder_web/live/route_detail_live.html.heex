@@ -58,8 +58,17 @@
               {"Score may be out of date — check airline advisories", "text-orange-400/75", "bg-orange-400/5 border-orange-400/15"}
             _ ->
               case @route.score.label do
-                :flowing     -> {"Book with confidence",           "text-emerald-400",   "bg-emerald-400/5 border-emerald-400/20"}
-                :watchful    -> {"Monitor before booking",         "text-amber-400",     "bg-amber-400/5 border-amber-400/20"}
+                :flowing -> {"Book with confidence", "text-emerald-400", "bg-emerald-400/5 border-emerald-400/20"}
+                :watchful ->
+                  # When pressure is ≥10 points above structural, the weakness is
+                  # structural fragility (corridor dependency, limited alternatives),
+                  # not current airspace exposure. Use softer framing that leads with
+                  # what's clear, rather than implying something active to monitor.
+                  if @route.score.pressure_score - @route.score.structural_score >= 10 do
+                    {"Clear of advisory zones — fewer backup paths than top alternatives", "text-amber-400", "bg-amber-400/5 border-amber-400/20"}
+                  else
+                    {"Monitor before booking", "text-amber-400", "bg-amber-400/5 border-amber-400/20"}
+                  end
                 :constrained -> {"Book carefully — fewer options", "text-orange-400/90", "bg-orange-400/5 border-orange-400/20"}
                 :strained    -> {"Consider alternatives",          "text-red-400/80",    "bg-red-400/5 border-red-400/20"}
               end
@@ -79,8 +88,11 @@
           <h1 class="text-lg font-bold text-base-content tracking-tight leading-snug mb-0.5">
             <%= @route.route_name %>
           </h1>
-          <p class="text-xs text-base-content/40 mb-2.5">
+          <p class="text-xs text-base-content/40 mb-1.5">
             <%= @route.origin_city.name %> → <%= @route.destination_city.name %>
+          </p>
+          <p class="text-xs text-base-content/40 leading-relaxed mb-2.5">
+            Flights from <%= @route.origin_city.name %> to <%= @route.destination_city.name %> are currently taking different paths. See how this route compares before you book.
           </p>
           <%= if ctx = Pathfinder.Advisory.Freshness.source_context(detail_freshness, zone_checked_at) do %>
             <p class="text-[10px] text-emerald-400/60 leading-relaxed"><%= ctx %></p>
@@ -116,7 +128,7 @@
 
           <% {fb_label, fb_color} = Pathfinder.Scoring.fallback_strength(@route.score.corridor_score) %>
           <div class="bg-base-200 rounded-xl p-3 border border-base-300 text-center">
-            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Fallback</p>
+            <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Alt routes</p>
             <p class={"text-xs font-semibold #{fb_color}"}><%= fb_label %></p>
           </div>
 

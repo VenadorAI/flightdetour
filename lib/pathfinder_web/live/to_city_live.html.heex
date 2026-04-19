@@ -19,11 +19,16 @@
     <h1 class="text-2xl font-bold text-base-content tracking-tight mb-1">
       Flights to <%= @city.name %>
     </h1>
+    <%= if @origins != [] do %>
+      <p class="text-xs text-base-content/35 leading-relaxed mb-4">
+        Not every flight to <%= @city.name %> is taking the same path right now — routes vary by airspace exposure, length, and how many ways there are to rebook if something changes.
+      </p>
+    <% end %>
     <%= if @origins == [] do %>
       <%!-- Empty inbound state --%>
       <p class="text-sm text-base-content/45 mb-5 leading-relaxed">
-        No covered inbound routes to <%= @city.name %> yet.
-        FlightDetour focuses on long-haul corridors where airspace routing choices create meaningful differences — we're expanding coverage gradually.
+        We don't have covered routes to <%= @city.name %> yet.
+        FlightDetour tracks long-haul routes where the choice of path — via the Gulf, Central Asia, or East Asia — creates real differences in airspace exposure and flight length.
       </p>
 
       <%= if @departures != [] do %>
@@ -61,7 +66,7 @@
       <% flowing = Enum.count(@origins, fn {_, b} -> b.score && b.score.label == :flowing end) %>
       <% constrained = Enum.count(@origins, fn {_, b} -> b.score && b.score.label in [:constrained, :strained] end) %>
       <p class="text-sm text-base-content/45 mb-5 leading-relaxed">
-        Disruption status for <%= length(@origins) %> covered <%= if length(@origins) == 1, do: "origin", else: "origins" %> with inbound routes to <%= @city.name %>.
+        <%= length(@origins) %> <%= if length(@origins) == 1, do: "city", else: "cities" %> currently flying to <%= @city.name %> — see which routes look cleaner right now.
         <%= cond do %>
           <% flowing == length(@origins) -> %>
             All routes currently Flowing.
@@ -70,7 +75,7 @@
           <% constrained > 0 -> %>
             <%= flowing %> Flowing · <%= constrained %> Constrained or Strained — check before you book.
           <% true -> %>
-            Scores reflect airspace advisories, corridor pressure, and operational stability.
+            Scores reflect airspace conditions, available alternatives, and carrier options.
         <% end %>
       </p>
 
