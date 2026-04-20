@@ -1,5 +1,25 @@
 // MapLibre GL JS hook for Pathfinder route visualization.
 // maplibregl loaded as global via CDN in root layout.
+//
+// Key design decisions:
+//
+// Visibility guard — mounted() exits early if offsetWidth===0.  This prevents
+// the mobile map panel (md:hidden, display:none on desktop) from initialising
+// a full MapLibre instance on desktop.
+//
+// Re-render guard — _renderRoutes fingerprints incoming route IDs.  Identical
+// payloads are skipped so switching the mobile tab never triggers redundant GL
+// work.
+//
+// Animated line draw — the selected route arc draws in over ~800ms using
+// requestAnimationFrame + progressive source data updates. Non-selected routes
+// render immediately.
+//
+// Origin/dest markers — maplibregl.Marker with custom HTML pills showing the
+// IATA codes, positioned at the first/last geojson coordinates.
+//
+// Zone pulse — a gentle sin-wave opacity animation on advisory zone fills,
+// making them feel "live" rather than static decoration.
 
 const CARTO_DARK = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
 const CARTO_ATTR = "© OpenStreetMap contributors, © CARTO"
@@ -7,7 +27,6 @@ const CARTO_ATTR = "© OpenStreetMap contributors, © CARTO"
 function buildStyle() {
   return {
     version: 8,
-    // No glyphs — we render no text labels on this map
     sources: {
       basemap: {
         type: "raster",
@@ -28,16 +47,30 @@ function buildStyle() {
 
 const MapHook = {
   mounted() {
+    // ── Visibility guard ──────────────────────────────────────────────────
+    // Skip initialisation when this element (or an ancestor) is display:none.
+    // On desktop, the mobile map panel has offsetWidth===0 via md:hidden.
+    if (this.el.offsetWidth === 0 && this.el.offsetHeight === 0) {
+      this._skipped = true
+      return
+    }
+
     if (typeof maplibregl === "undefined") {
       console.warn("Pathfinder: maplibregl not loaded")
       this._showMapError()
       return
     }
 
-    this.routeData = []
-    this.selectedId = null
-    this.mapReady = false
+    this.routeData   = []
+    this.selectedId  = null
+    this.mapReady    = false
     this.pendingRender = null
+    this.lastRouteIds  = null
+    this._markers    = []
+    this._animFrame  = null
+    this._pulseFrame = null
+
+    console.time(`map-init:${this.el.id}`)
 
     try {
       this.map = new maplibregl.Map({
@@ -52,20 +85,15 @@ const MapHook = {
         attributionControl: false
       })
 
-      // ResizeObserver: handles flex layout changes and container resizes
+      // ResizeObserver: fires when the element changes size — including when a
+      // display:none parent becomes visible again (tab switch back to map panel).
       this._resizeObserver = new ResizeObserver(() => {
         if (this.map) this.map.resize()
       })
       this._resizeObserver.observe(this.el)
 
-      // Double rAF: mounted() can run before the browser finalises flex heights
-      // (especially on desktop where md:h-full depends on a computed flex chain).
-      // Two animation frames ensure the layout is settled before MapLibre reads
-      // offsetHeight — this is the main fix for the blank results-page map.
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (this.map) this.map.resize()
-        })
+        requestAnimationFrame(() => { if (this.map) this.map.resize() })
       })
 
       this._onWindowResize = () => { if (this.map) this.map.resize() }
@@ -79,8 +107,8 @@ const MapHook = {
       this.map.on("load", () => {
         this.mapReady = true
         this.map.resize()
-        // Second resize via rAF catches any remaining layout settling after style load
         requestAnimationFrame(() => { if (this.map) this.map.resize() })
+        console.timeEnd(`map-init:${this.el.id}`)
         this._hideSkeleton()
         if (this.pendingRender) {
           this._renderRoutes(this.pendingRender)
@@ -89,7 +117,6 @@ const MapHook = {
       })
 
       this.map.on("error", (e) => {
-        // Tile errors are non-fatal — only log, don't crash
         if (e.error && e.error.status !== 404) {
           console.warn("Pathfinder map error:", e.error)
         }
@@ -102,11 +129,17 @@ const MapHook = {
     }
 
     this.handleEvent("render-routes", (data) => {
-      // Ensure canvas dimensions are current before rendering — catches the case
-      // where the map was created before the flex container had its final height.
+      // ── Re-render guard ───────────────────────────────────────────────
+      const incomingIds = (data.routes || []).map(r => r.id).sort().join(",")
+      if (incomingIds === this.lastRouteIds) return
+      this.lastRouteIds = incomingIds
+
       if (this.map) this.map.resize()
+      console.time(`map-render:${this.el.id}`)
+
       if (this.mapReady) {
         this._renderRoutes(data)
+        console.timeEnd(`map-render:${this.el.id}`)
       } else {
         this.pendingRender = data
       }
@@ -118,36 +151,33 @@ const MapHook = {
   },
 
   destroyed() {
+    if (this._skipped) return
+    this._cancelAnimations()
+    if (this._markers) this._markers.forEach(m => m.remove())
     if (this.map) this.map.remove()
     if (this._resizeObserver) this._resizeObserver.disconnect()
     if (this._onWindowResize) window.removeEventListener("resize", this._onWindowResize)
   },
 
-  _hideSkeleton() {
-    const skeleton = document.getElementById("map-skeleton")
-    if (!skeleton) return
-    skeleton.style.opacity = "0"
-    skeleton.style.transition = "opacity 0.4s"
-    setTimeout(() => { skeleton.style.display = "none" }, 420)
-  },
-
-  _showMapError() {
-    const skeleton = document.getElementById("map-skeleton")
-    if (skeleton) {
-      skeleton.innerHTML = '<p style="color:#666;font-size:12px;text-align:center;padding:20px">Map unavailable</p>'
-    }
-  },
+  // ── Render pipeline ───────────────────────────────────────────────────────
 
   _renderRoutes({ routes, zones, selected_id }) {
-    this.routeData = routes
+    this.routeData  = routes
     this.selectedId = selected_id
     this._clearDynamicLayers()
     this._addZoneOverlays(zones || [])
     this._addRouteLines(routes, selected_id)
+    this._addMarkers(routes)
     this._fitBounds(routes)
+    if (zones && zones.length > 0) this._startZonePulse(zones)
   },
 
   _clearDynamicLayers() {
+    this._cancelAnimations()
+
+    // Remove HTML markers
+    if (this._markers) { this._markers.forEach(m => m.remove()); this._markers = [] }
+
     const style = this.map.getStyle()
     if (!style) return
     const toRemove = style.layers
@@ -158,6 +188,13 @@ const MapHook = {
       .filter(s => s.startsWith("route-") || s.startsWith("zone-"))
       .forEach(id => { if (this.map.getSource(id)) this.map.removeSource(id) })
   },
+
+  _cancelAnimations() {
+    if (this._animFrame)  { cancelAnimationFrame(this._animFrame);  this._animFrame  = null }
+    if (this._pulseFrame) { cancelAnimationFrame(this._pulseFrame); this._pulseFrame = null }
+  },
+
+  // ── Zone overlays + pulse ─────────────────────────────────────────────────
 
   _addZoneOverlays(zones) {
     zones.forEach(zone => {
@@ -171,7 +208,7 @@ const MapHook = {
       if (!this.map.getLayer(`zone-fill-${zone.id}`)) {
         this.map.addLayer({
           id: `zone-fill-${zone.id}`, type: "fill", source: sid,
-          paint: { "fill-color": zone.color, "fill-opacity": zone.opacity }
+          paint: { "fill-color": zone.color, "fill-opacity": 0.12 }
         })
       }
       if (!this.map.getLayer(`zone-line-${zone.id}`)) {
@@ -183,33 +220,54 @@ const MapHook = {
     })
   },
 
+  // Breathing animation on zone fill opacity (0.07 → 0.22 → 0.07, ~3s cycle).
+  // More pronounced than before so zones feel clearly "active" on the map.
+  _startZonePulse(zones) {
+    let tick = 0
+    const pulse = () => {
+      tick++
+      const alpha = 0.07 + 0.15 * ((Math.sin(tick * 0.035) + 1) / 2) // 0.07–0.22, period ≈ 3s
+      zones.forEach(zone => {
+        if (this.map && this.map.getLayer(`zone-fill-${zone.id}`)) {
+          this.map.setPaintProperty(`zone-fill-${zone.id}`, "fill-opacity", alpha)
+        }
+      })
+      this._pulseFrame = requestAnimationFrame(pulse)
+    }
+    this._pulseFrame = requestAnimationFrame(pulse)
+  },
+
+  // ── Route lines ───────────────────────────────────────────────────────────
+
   _addRouteLines(routes, selectedId) {
     routes.forEach(route => {
       const sid = `route-src-${route.id}`
       const isSelected = route.id === selectedId
-      const coords = this._buildArc(route.geojson.coordinates)
+      const arcCoords  = this._buildArc(route.geojson.coordinates)
 
-      const geojsonData = {
+      // Add source with the first 2 points only — the animated draw will
+      // progressively fill in the rest for the selected route.
+      const initialGeom = {
         type: "Feature",
         properties: { id: route.id },
-        geometry: { type: "LineString", coordinates: coords }
+        geometry: { type: "LineString", coordinates: arcCoords.slice(0, 2) }
       }
 
       if (!this.map.getSource(sid)) {
-        this.map.addSource(sid, { type: "geojson", data: geojsonData })
+        this.map.addSource(sid, { type: "geojson", data: initialGeom })
       } else {
-        this.map.getSource(sid).setData(geojsonData)
+        this.map.getSource(sid).setData(initialGeom)
       }
 
-      // Glow layer (selected only)
+      // Glow layer (selected routes only — adds depth)
       if (!this.map.getLayer(`route-glow-${route.id}`)) {
         this.map.addLayer({
           id: `route-glow-${route.id}`, type: "line", source: sid,
           paint: {
             "line-color": route.color,
-            "line-opacity": isSelected ? 0.25 : 0,
-            "line-width": 8,
-            "line-blur": 6
+            "line-opacity": isSelected ? 0.30 : 0,
+            "line-width": 12,
+            "line-blur": 10
           },
           layout: { "line-cap": "round", "line-join": "round" }
         })
@@ -221,8 +279,8 @@ const MapHook = {
           id: `route-line-${route.id}`, type: "line", source: sid,
           paint: {
             "line-color": route.color,
-            "line-opacity": isSelected ? 1.0 : 0.30,
-            "line-width": isSelected ? 3 : 1.5,
+            "line-opacity": isSelected ? 1.0 : 0.25,
+            "line-width": isSelected ? 3.5 : 1.5,
             "line-dasharray": isSelected ? [1] : [5, 4]
           },
           layout: { "line-cap": "round", "line-join": "round" }
@@ -240,8 +298,108 @@ const MapHook = {
       this.map.on("mouseleave", `route-line-${route.id}`, () => {
         this.map.getCanvas().style.cursor = ""
       })
+
+      // Animate the selected route drawing in; show others immediately
+      if (isSelected) {
+        this._animateRouteDraw(sid, route.id, arcCoords)
+      } else {
+        this.map.getSource(sid).setData({
+          type: "Feature",
+          properties: { id: route.id },
+          geometry: { type: "LineString", coordinates: arcCoords }
+        })
+      }
     })
   },
+
+  // Draws the route arc progressively over ~800ms using requestAnimationFrame.
+  // Runs ~50 frames, updating the GeoJSON source with an increasing slice of
+  // the coordinate array. Gives users a clear sense of the route's direction.
+  _animateRouteDraw(sourceId, routeId, arcCoords) {
+    const total   = arcCoords.length
+    const frames  = 50
+    const step    = Math.max(1, Math.ceil(total / frames))
+    let   drawn   = 2
+
+    const tick = () => {
+      drawn = Math.min(drawn + step, total)
+      const src = this.map && this.map.getSource(sourceId)
+      if (!src) return
+      src.setData({
+        type: "Feature",
+        properties: { id: routeId },
+        geometry: { type: "LineString", coordinates: arcCoords.slice(0, drawn) }
+      })
+      if (drawn < total) {
+        this._animFrame = requestAnimationFrame(tick)
+      } else {
+        this._animFrame = null
+      }
+    }
+    this._animFrame = requestAnimationFrame(tick)
+  },
+
+  // ── Origin / destination markers ──────────────────────────────────────────
+
+  // Adds IATA code pill markers at the first and last coordinates of each route.
+  // Origin: white/neutral pill.  Destination: colored pill matching route color.
+  // Positioned at "bottom" anchor so the pill sits above the coordinate point.
+  _addMarkers(routes) {
+    this._markers = this._markers || []
+    this._markers.forEach(m => m.remove())
+    this._markers = []
+
+    routes.forEach(route => {
+      const coords = route.geojson && route.geojson.coordinates
+      if (!coords || coords.length < 2) return
+
+      const [oLng, oLat] = coords[0]
+      const [dLng, dLat] = coords[coords.length - 1]
+
+      const originLabel = route.origin_iata || "○"
+      const destLabel   = route.dest_iata   || "●"
+
+      // Origin marker — white pill, neutral feel
+      const originEl = this._markerEl(originLabel, "rgba(240,240,240,0.92)", "#111", route.origin_name)
+      this._markers.push(
+        new maplibregl.Marker({ element: originEl, anchor: "bottom", offset: [0, -4] })
+          .setLngLat([oLng, oLat])
+          .addTo(this.map)
+      )
+
+      // Destination marker — route color, draws attention to the endpoint
+      const destEl = this._markerEl(destLabel, route.color || "#10b981", "#fff", route.dest_name)
+      this._markers.push(
+        new maplibregl.Marker({ element: destEl, anchor: "bottom", offset: [0, -4] })
+          .setLngLat([dLng, dLat])
+          .addTo(this.map)
+      )
+    })
+  },
+
+  _markerEl(iata, bg, color, title) {
+    const el = document.createElement("div")
+    el.title = title || ""
+    Object.assign(el.style, {
+      background:     bg,
+      color:          color,
+      padding:        "2px 7px",
+      borderRadius:   "5px",
+      fontSize:       "11px",
+      fontWeight:     "700",
+      letterSpacing:  "0.07em",
+      whiteSpace:     "nowrap",
+      boxShadow:      "0 2px 8px rgba(0,0,0,0.55)",
+      border:         "1.5px solid rgba(255,255,255,0.18)",
+      pointerEvents:  "none",
+      userSelect:     "none",
+      fontFamily:     "ui-monospace, 'Cascadia Code', monospace"
+    })
+    el.textContent = iata
+    return el
+  },
+
+  // ── Highlight + bounds ────────────────────────────────────────────────────
 
   _highlightRoute(selectedId) {
     this.selectedId = selectedId
@@ -255,7 +413,7 @@ const MapHook = {
         this.map.setPaintProperty(lineId, "line-dasharray", isSelected ? [1] : [5, 4])
       }
       if (this.map.getLayer(glowId)) {
-        this.map.setPaintProperty(glowId, "line-opacity", isSelected ? 0.25 : 0)
+        this.map.setPaintProperty(glowId, "line-opacity", isSelected ? 0.30 : 0)
       }
     })
   },
@@ -278,10 +436,29 @@ const MapHook = {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" })
   },
 
-  // Great-circle arc: spherical linear interpolation (slerp) between each waypoint pair.
-  // Routes naturally curve along the Earth's surface — long east-west segments arc
-  // poleward correctly, matching actual flight paths rather than adding an artificial
-  // lat-bulge that could visually cut through Russia or other closed airspace.
+  // ── Skeleton helpers ──────────────────────────────────────────────────────
+
+  _skeleton() {
+    const id = this.el.dataset.skeletonId
+    return id ? document.getElementById(id) : null
+  },
+
+  _hideSkeleton() {
+    const el = this._skeleton()
+    if (!el) return
+    el.style.opacity = "0"
+    setTimeout(() => { el.style.display = "none" }, 520)
+  },
+
+  _showMapError() {
+    const el = this._skeleton()
+    if (el) {
+      el.innerHTML = '<p style="color:#555;font-size:12px;text-align:center;padding:20px">Map unavailable</p>'
+    }
+  },
+
+  // ── Great-circle arc (slerp) ──────────────────────────────────────────────
+
   _buildArc(coordinates, n = 60) {
     if (coordinates.length < 2) return coordinates
 
@@ -295,19 +472,16 @@ const MapHook = {
       const lon1 = toRad(lon1d), lat1 = toRad(lat1d)
       const lon2 = toRad(lon2d), lat2 = toRad(lat2d)
 
-      // Haversine angular distance between the two points
       const dLat = lat2 - lat1, dLon = lon2 - lon1
       const a = Math.sin(dLat / 2) ** 2 +
                 Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
       const d = 2 * Math.asin(Math.sqrt(a))
 
-      // Include the last point only on the final segment to avoid duplicates
       const pts = s < coordinates.length - 2 ? n : n + 1
 
       for (let i = 0; i < pts; i++) {
         const t = i / n
         if (d < 1e-6) {
-          // Points are essentially identical — linear fallback
           out.push([lon1d + (lon2d - lon1d) * t, lat1d + (lat2d - lat1d) * t])
           continue
         }

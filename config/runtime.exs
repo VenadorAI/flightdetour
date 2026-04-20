@@ -75,8 +75,15 @@ if config_env() == :prod do
 
   config :pathfinder, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # Origins that may open a LiveView WebSocket connection.
+  # Derived from PHX_HOST so no extra env var is needed for the primary domain.
+  # www. variant included so both bare and www work without separate config.
+  # Add the onrender domain here if you need shell/health access to still use WS.
+  allowed_origins = ["https://#{host}", "https://www.#{host}"]
+
   config :pathfinder, PathfinderWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
+    check_origin: allowed_origins,
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
