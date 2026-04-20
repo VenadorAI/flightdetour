@@ -228,7 +228,34 @@ const MapHook = {
           paint: { "line-color": zone.color, "line-opacity": 0.22, "line-width": 1 }
         })
       }
+
+      this.map.on("click", `zone-fill-${zone.id}`, (e) => {
+        const ageText = zone.last_changed_at
+          ? `Updated ${this._formatAge(zone.last_changed_at)}`
+          : "Status: active"
+        new maplibregl.Popup({ closeButton: false, maxWidth: "200px" })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font-size:11px;line-height:1.5;padding:6px 8px;background:#1a1a2e;color:#e2e8f0;border-radius:6px;"><div style="font-weight:600;margin-bottom:2px;">${zone.name}</div><div style="opacity:0.65;">EASA advisory · ${ageText}</div></div>`)
+          .addTo(this.map)
+      })
+      this.map.on("mouseenter", `zone-fill-${zone.id}`, () => {
+        this.map.getCanvas().style.cursor = "pointer"
+      })
+      this.map.on("mouseleave", `zone-fill-${zone.id}`, () => {
+        this.map.getCanvas().style.cursor = ""
+      })
     })
+  },
+
+  _formatAge(datetimeStr) {
+    if (!datetimeStr) return "status unknown"
+    const then = new Date(datetimeStr)
+    const diffMs = Date.now() - then.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    if (diffDays > 0) return `changed ${diffDays}d ago`
+    if (diffHours > 0) return `changed ${diffHours}h ago`
+    return "changed recently"
   },
 
   // Very subtle zone pulse — barely visible, just enough to signal "live data".

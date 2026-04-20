@@ -118,18 +118,28 @@
         <% end %>
       </div>
 
-      <%!-- Featured routes — pairs where the corridor choice creates meaningful advisory differences --%>
+      <%!-- Featured routes — 6 curated pairs where corridor choice matters most --%>
       <%= if length(@featured_pairs) > 0 do %>
         <div class="mt-6">
-          <p class="text-[10px] text-base-content/30 uppercase tracking-widest text-center mb-3">Corridors with the biggest score gap between options</p>
-          <div class="flex flex-wrap gap-1.5 justify-center">
+          <p class="text-[10px] text-base-content/30 uppercase tracking-widest text-center mb-3">Routes where the corridor choice matters right now</p>
+          <div class="flex flex-col gap-1.5">
             <%= for pair <- @featured_pairs do %>
               <% slug = Pathfinder.CitySlug.pair_slug(pair.origin, pair.destination) %>
               <.link
                 navigate={~p"/route/#{slug}"}
-                class="px-3 py-2 rounded-full bg-base-200 border border-base-300 text-xs text-base-content/55 hover:bg-base-300 hover:text-base-content/85 hover:border-base-content/20 transition-all"
+                class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
               >
-                <%= pair.label %>
+                <span class="flex-1 text-sm text-base-content/65 group-hover:text-base-content/85 font-medium"><%= pair.label %></span>
+                <%= if pair.best_label && pair.best_score do %>
+                  <% score_color = case pair.best_label do
+                    :flowing     -> "text-emerald-400/75"
+                    :watchful    -> "text-amber-400/70"
+                    :constrained -> "text-orange-400/65"
+                    _            -> "text-red-400/60"
+                  end %>
+                  <span class={"text-xs font-semibold tabular-nums shrink-0 #{score_color}"}><%= pair.best_score %></span>
+                <% end %>
+                <span class="text-base-content/25 text-xs group-hover:text-base-content/50 shrink-0">→</span>
               </.link>
             <% end %>
           </div>

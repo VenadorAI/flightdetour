@@ -51,7 +51,8 @@ defmodule Pathfinder.Disruption do
           severity: zone.severity,
           color: DisruptionZone.severity_color(zone.severity),
           opacity: DisruptionZone.severity_opacity(zone.severity),
-          geojson: zone.boundary_geojson
+          geojson: zone.boundary_geojson,
+          last_changed_at: zone.last_changed_at
         }
       end)
     end)

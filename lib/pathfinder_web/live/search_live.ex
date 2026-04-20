@@ -35,7 +35,7 @@ defmodule PathfinderWeb.SearchLive do
      |> assign(:destination_suggestions, [])
      |> assign(:origin_city, nil)
      |> assign(:destination_city, nil)
-     |> assign(:featured_pairs, Routes.featured_route_pairs())
+     |> assign(:featured_pairs, Routes.featured_route_pairs_with_scores())
      |> assign(:route_count, Routes.active_route_count())
      |> assign(:active_zones, Disruption.list_active_zones())
      |> assign(:latest_source_check, Disruption.latest_source_check())}

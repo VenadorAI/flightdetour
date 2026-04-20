@@ -417,6 +417,40 @@ defmodule Pathfinder.Routes do
     |> Enum.map(fn {o, d} -> %{label: "#{o} → #{d}", origin: o, destination: d} end)
   end
 
+  # Returns up to 6 curated featured pairs with their best route's score label
+  # and composite score — used on the homepage pill grid. Runs one city + route
+  # lookup per pair (bounded at 6), which is acceptable at mount time.
+  @homepage_featured_pairs [
+    {"London",    "Bangkok"},
+    {"London",    "Singapore"},
+    {"Frankfurt", "Bangkok"},
+    {"London",    "Tokyo"},
+    {"New York",  "Delhi"},
+    {"Frankfurt", "Delhi"},
+  ]
+
+  def featured_route_pairs_with_scores do
+    @homepage_featured_pairs
+    |> Enum.flat_map(fn {origin_name, dest_name} ->
+      origin = get_city_by_name(origin_name)
+      dest   = get_city_by_name(dest_name)
+
+      if origin && dest do
+        best = find_routes(origin.id, dest.id) |> best_route()
+
+        [%{
+          label:       "#{origin_name} → #{dest_name}",
+          origin:      origin_name,
+          destination: dest_name,
+          best_label:  best && best.score && best.score.label,
+          best_score:  best && best.score && best.score.composite_score
+        }]
+      else
+        []
+      end
+    end)
+  end
+
   # Builds the home-page preset list (flat, for sitemap / legacy callers).
   def popular_route_pairs do
     active_set = active_city_pairs() |> MapSet.new()

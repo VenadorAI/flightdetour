@@ -16,7 +16,6 @@ defmodule PathfinderWeb.ResultsLive do
      |> assign(:not_covered, false)
      |> assign(:loading, false)
      |> assign(:show_all_routes, false)
-     |> assign(:show_compare, false)
      |> assign(:pair_slug, nil)
      |> assign(:nearby_from_origin, [])
      |> assign(:nearby_to_destination, [])
@@ -102,10 +101,6 @@ defmodule PathfinderWeb.ResultsLive do
     {:noreply, assign(socket, :show_all_routes, !socket.assigns.show_all_routes)}
   end
 
-  def handle_event("toggle-compare", _params, socket) do
-    {:noreply, assign(socket, :show_compare, !socket.assigns.show_compare)}
-  end
-
   # MapHook fires this when MapLibre's load event fires before the WS push_event
   # arrives (fast tile cache, slow socket, reconnect). Re-pushes render data.
   def handle_event("map-ready", _params, socket) do
@@ -173,7 +168,6 @@ defmodule PathfinderWeb.ResultsLive do
       |> assign(:selected_route_id, if(best, do: best.id, else: nil))
       |> assign(:latest_source_check, Disruption.latest_source_check())
       |> assign(:show_all_routes, false)
-      |> assign(:show_compare, false)
       |> assign(:pair_slug, pair_slug)
 
     if connected?(socket) do
@@ -220,8 +214,6 @@ defmodule PathfinderWeb.ResultsLive do
     |> assign(:nearby_to_destination, nearby.to_destination)
     |> assign(:featured_pairs, featured_pairs)
   end
-
-  defp selected?(route, selected_id), do: route.id == selected_id
 
   # ── Best-route summary helpers ───────────────────────────────────────────────
   # Map numeric factor scores into 3 plain-English labels for the summary block.

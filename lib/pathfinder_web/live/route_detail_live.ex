@@ -22,7 +22,6 @@ defmodule PathfinderWeb.RouteDetailLive do
     iata_d = hd(route.destination_city.iata_codes || [""])
     outbound_links = Pathfinder.Outbound.search_links(iata_o, iata_d)
     sky = Enum.find(outbound_links, fn {k, _, _} -> k == :skyscanner end)
-    sec_links = Enum.reject(outbound_links, fn {k, _, _} -> k == :skyscanner end)
 
     {detail_freshness, zone_checked_at, changed_zones} =
       if route.score do
@@ -89,10 +88,8 @@ defmodule PathfinderWeb.RouteDetailLive do
       |> assign(:pair_slug, pair_slug)
       |> assign(:sibling_routes, Enum.reject(sibling_routes, & &1.id == route.id))
       |> assign(:sky, sky)
-      |> assign(:sec_links, sec_links)
       |> assign(:iata_o, iata_o)
       |> assign(:iata_d, iata_d)
-      |> assign(:cta_label, cta_label(route))
       |> assign(:detail_freshness, detail_freshness)
       |> assign(:zone_checked_at, zone_checked_at)
       |> assign(:changed_zones, changed_zones)
@@ -160,22 +157,6 @@ defmodule PathfinderWeb.RouteDetailLive do
       dest_iata: iata_d,
       dest_name: route.destination_city.name
     }
-  end
-
-  # Contextual CTA copy: reflects the actual route hub and safety level.
-  # Converts generic "Search on Skyscanner" into something that tells users
-  # exactly what they're booking and why.
-  defp cta_label(route) do
-    hub = route.via_hub_city && route.via_hub_city.name
-    label = route.score && route.score.label
-
-    cond do
-      hub && label == :flowing -> "Book via #{hub} — recommended route"
-      hub                      -> "Find flights via #{hub}"
-      label == :flowing        -> "Book this safer route"
-      label == :watchful       -> "Search flights — monitor conditions"
-      true                     -> "Search flights for this route"
-    end
   end
 
   defp back_path(_route, pair_slug), do: ~p"/route/#{pair_slug}"
