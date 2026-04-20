@@ -1,6 +1,6 @@
 defmodule Pathfinder.Disruption do
   import Ecto.Query
-  alias Pathfinder.Repo
+  alias Pathfinder.{Repo, RouteCache}
   alias Pathfinder.Disruption.DisruptionZone
   alias Pathfinder.Routes.Route
 
@@ -40,18 +40,20 @@ defmodule Pathfinder.Disruption do
   end
 
   def active_zones_geojson do
-    list_active_zones()
-    |> Enum.filter(& &1.boundary_geojson)
-    |> Enum.map(fn zone ->
-      %{
-        id: zone.id,
-        slug: zone.slug,
-        name: zone.name,
-        severity: zone.severity,
-        color: DisruptionZone.severity_color(zone.severity),
-        opacity: DisruptionZone.severity_opacity(zone.severity),
-        geojson: zone.boundary_geojson
-      }
+    RouteCache.fetch(:active_zones_geojson, 300, fn ->
+      list_active_zones()
+      |> Enum.filter(& &1.boundary_geojson)
+      |> Enum.map(fn zone ->
+        %{
+          id: zone.id,
+          slug: zone.slug,
+          name: zone.name,
+          severity: zone.severity,
+          color: DisruptionZone.severity_color(zone.severity),
+          opacity: DisruptionZone.severity_opacity(zone.severity),
+          geojson: zone.boundary_geojson
+        }
+      end)
     end)
   end
 end

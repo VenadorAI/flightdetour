@@ -257,10 +257,9 @@
         <% end %>
 
         <%!-- ── SEARCH CTA ──────────────────────────────────────────────── --%>
-        <%!-- Skyscanner found by key — immune to provider list order --%>
-        <% outbound_links = Pathfinder.Outbound.search_links(iata_o, iata_d) %>
-        <% sky = Enum.find(outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
-        <% sec_links = Enum.reject(outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
+        <%!-- outbound_links computed once in handle_params, assigned to socket --%>
+        <% sky = Enum.find(@outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
+        <% sec_links = Enum.reject(@outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
         <%= if sky do %>
           <% {sky_key, sky_label, _} = sky %>
           <div class="mb-5 px-4 py-4 rounded-xl border border-base-300 bg-base-200">
@@ -477,11 +476,11 @@
           ← Back to results
         </.link>
         <%= if @route.score do %>
-          <% fo = hd(@route.origin_city.iata_codes || [""]) %>
-          <% fd = hd(@route.destination_city.iata_codes || [""]) %>
-          <% footer_sky = Enum.find(Pathfinder.Outbound.search_links(fo, fd), fn {k, _, _} -> k == :skyscanner end) %>
+          <% footer_sky = Enum.find(@outbound_links, fn {k, _, _} -> k == :skyscanner end) %>
           <%= if footer_sky do %>
             <% {fsk, fsl, _} = footer_sky %>
+            <% fo = hd(@route.origin_city.iata_codes || [""]) %>
+            <% fd = hd(@route.destination_city.iata_codes || [""]) %>
             <a
               href={"/go?provider=#{fsk}&o=#{fo}&d=#{fd}&pair=#{@pair_slug}&route_id=#{@route.id}"}
               target="_blank"

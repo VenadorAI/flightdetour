@@ -15,6 +15,7 @@ defmodule Pathfinder.Application do
       Pathfinder.Repo,
       {DNSCluster, query: Application.get_env(:pathfinder, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Pathfinder.PubSub},
+      Pathfinder.RouteCache,
       {Oban, Application.fetch_env!(:pathfinder, Oban)},
       PathfinderWeb.Endpoint
     ]

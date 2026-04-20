@@ -1,6 +1,6 @@
 defmodule Pathfinder.Routes do
   import Ecto.Query
-  alias Pathfinder.Repo
+  alias Pathfinder.{Repo, RouteCache}
   alias Pathfinder.Routes.{City, Route, RouteScore}
 
   # --- City queries ---
@@ -41,16 +41,19 @@ defmodule Pathfinder.Routes do
 
   # Returns all unique (origin, destination) city name pairs with active routes.
   # Used by the sitemap to generate canonical pair URLs.
+  # Cached: called on every search mount via featured_route_pairs/0.
   def active_city_pairs do
-    from(r in Route,
-      join: oc in City, on: oc.id == r.origin_city_id,
-      join: dc in City, on: dc.id == r.destination_city_id,
-      where: r.is_active == true,
-      distinct: true,
-      select: {oc.name, dc.name},
-      order_by: [asc: oc.name, asc: dc.name]
-    )
-    |> Repo.all()
+    RouteCache.fetch(:active_city_pairs, 300, fn ->
+      from(r in Route,
+        join: oc in City, on: oc.id == r.origin_city_id,
+        join: dc in City, on: dc.id == r.destination_city_id,
+        where: r.is_active == true,
+        distinct: true,
+        select: {oc.name, dc.name},
+        order_by: [asc: oc.name, asc: dc.name]
+      )
+      |> Repo.all()
+    end)
   end
 
   # Returns all cities that have at least one active outbound route.
@@ -79,45 +82,58 @@ defmodule Pathfinder.Routes do
 
   # Returns {origin_city, best_route} pairs for all active routes to a city,
   # sorted by best composite score descending.
+  # Cached per city_id: hub pages are frequently revisited and the data is stable.
+  # via_hub_city omitted — city hub pages display city name and score only.
   def origins_to_city(city_id) do
-    Route
-    |> where([r], r.destination_city_id == ^city_id and r.is_active == true)
-    |> preload([:origin_city, :destination_city, :via_hub_city, score: []])
-    |> Repo.all()
-    |> Enum.group_by(& &1.origin_city_id)
-    |> Enum.map(fn {_origin_id, routes} ->
-      best = best_route(routes)
-      {best && best.origin_city, best}
+    RouteCache.fetch({:origins_to_city, city_id}, 300, fn ->
+      Route
+      |> where([r], r.destination_city_id == ^city_id and r.is_active == true)
+      |> preload([:origin_city, :destination_city, score: []])
+      |> Repo.all()
+      |> Enum.group_by(& &1.origin_city_id)
+      |> Enum.map(fn {_origin_id, routes} ->
+        best = best_route(routes)
+        {best && best.origin_city, best}
+      end)
+      |> Enum.reject(fn {city, best} -> is_nil(city) or is_nil(best) end)
+      |> Enum.sort_by(fn {_city, best} -> {-best.score.composite_score, raw_float(best.score)} end)
     end)
-    |> Enum.reject(fn {city, best} -> is_nil(city) or is_nil(best) end)
-    |> Enum.sort_by(fn {_city, best} -> {-best.score.composite_score, raw_float(best.score)} end)
   end
 
   # Returns {destination_city, best_route} pairs for all active routes from a city,
   # sorted by best composite score descending.
+  # Cached per city_id: hub pages are frequently revisited and the data is stable.
+  # via_hub_city omitted — city hub pages display city name and score only.
   def destinations_from_city(city_id) do
-    Route
-    |> where([r], r.origin_city_id == ^city_id and r.is_active == true)
-    |> preload([:origin_city, :destination_city, :via_hub_city, score: []])
-    |> Repo.all()
-    |> Enum.group_by(& &1.destination_city_id)
-    |> Enum.map(fn {_dest_id, routes} ->
-      best = best_route(routes)
-      {best && best.destination_city, best}
+    RouteCache.fetch({:destinations_from_city, city_id}, 300, fn ->
+      Route
+      |> where([r], r.origin_city_id == ^city_id and r.is_active == true)
+      |> preload([:origin_city, :destination_city, score: []])
+      |> Repo.all()
+      |> Enum.group_by(& &1.destination_city_id)
+      |> Enum.map(fn {_dest_id, routes} ->
+        best = best_route(routes)
+        {best && best.destination_city, best}
+      end)
+      |> Enum.reject(fn {city, best} -> is_nil(city) or is_nil(best) end)
+      |> Enum.sort_by(fn {_city, best} -> {-best.score.composite_score, raw_float(best.score)} end)
     end)
-    |> Enum.reject(fn {city, best} -> is_nil(city) or is_nil(best) end)
-    |> Enum.sort_by(fn {_city, best} -> {-best.score.composite_score, raw_float(best.score)} end)
   end
 
   # --- Route queries ---
 
+  # Cached per (origin_id, destination_id): the most frequently repeated query in the app.
+  # Every results page and route detail page fires this. TTL 10 minutes — safe because
+  # scores only change via deliberate seed or operator action.
   def find_routes(origin_id, destination_id) do
-    Route
-    |> where([r], r.origin_city_id == ^origin_id and r.destination_city_id == ^destination_id)
-    |> where([r], r.is_active == true)
-    |> preload([:origin_city, :destination_city, :via_hub_city, score: [], disruption_factors: [:disruption_zone]])
-    |> Repo.all()
-    |> sort_by_score()
+    RouteCache.fetch({:find_routes, origin_id, destination_id}, 600, fn ->
+      Route
+      |> where([r], r.origin_city_id == ^origin_id and r.destination_city_id == ^destination_id)
+      |> where([r], r.is_active == true)
+      |> preload([:origin_city, :destination_city, :via_hub_city, score: [], disruption_factors: [:disruption_zone]])
+      |> Repo.all()
+      |> sort_by_score()
+    end)
   end
 
   def find_routes_bidirectional(origin_id, destination_id) do
@@ -131,9 +147,11 @@ defmodule Pathfinder.Routes do
   end
 
   def get_route!(id) do
-    Route
-    |> preload([:origin_city, :destination_city, :via_hub_city, score: [], disruption_factors: [:disruption_zone]])
-    |> Repo.get!(id)
+    RouteCache.fetch({:route_by_id, id}, 600, fn ->
+      Route
+      |> preload([:origin_city, :destination_city, :via_hub_city, score: [], disruption_factors: [:disruption_zone]])
+      |> Repo.get!(id)
+    end)
   end
 
   def routes_for_pair?(origin_id, destination_id) do

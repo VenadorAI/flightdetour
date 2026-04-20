@@ -9,11 +9,21 @@ defmodule PathfinderWeb.RouteDetailLive do
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
+    t0 = System.monotonic_time(:millisecond)
     route = Routes.get_route!(id)
+    t1 = System.monotonic_time(:millisecond)
     zones = Disruption.active_zones_geojson()
+    t2 = System.monotonic_time(:millisecond)
     pair_slug = CitySlug.pair_slug(route.origin_city.name, route.destination_city.name)
     sibling_routes = Routes.find_routes(route.origin_city_id, route.destination_city_id)
+    t3 = System.monotonic_time(:millisecond)
+    iata_o = hd(route.origin_city.iata_codes || [""])
+    iata_d = hd(route.destination_city.iata_codes || [""])
+    outbound_links = Pathfinder.Outbound.search_links(iata_o, iata_d)
     base = PathfinderWeb.Endpoint.url()
+
+    require Logger
+    Logger.info("[RouteDetailLive] id=#{id} connected=#{connected?(socket)} get_route=#{t1 - t0}ms zones=#{t2 - t1}ms find_routes=#{t3 - t2}ms total=#{t3 - t0}ms")
 
     structured_data =
       Jason.encode!(%{
@@ -49,6 +59,7 @@ defmodule PathfinderWeb.RouteDetailLive do
       |> assign(:show_map, false)
       |> assign(:pair_slug, pair_slug)
       |> assign(:sibling_routes, Enum.reject(sibling_routes, & &1.id == route.id))
+      |> assign(:outbound_links, outbound_links)
 
     socket =
       # push_event here handles re-navigation between sibling routes when the map
