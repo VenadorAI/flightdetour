@@ -219,25 +219,25 @@ const MapHook = {
       if (!this.map.getLayer(`zone-fill-${zone.id}`)) {
         this.map.addLayer({
           id: `zone-fill-${zone.id}`, type: "fill", source: sid,
-          paint: { "fill-color": zone.color, "fill-opacity": 0.12 }
+          paint: { "fill-color": zone.color, "fill-opacity": 0.07 }
         })
       }
       if (!this.map.getLayer(`zone-line-${zone.id}`)) {
         this.map.addLayer({
           id: `zone-line-${zone.id}`, type: "line", source: sid,
-          paint: { "line-color": zone.color, "line-opacity": 0.5, "line-width": 1, "line-dasharray": [3, 3] }
+          paint: { "line-color": zone.color, "line-opacity": 0.22, "line-width": 1 }
         })
       }
     })
   },
 
-  // Breathing animation on zone fill opacity (0.07 → 0.22 → 0.07, ~3s cycle).
-  // More pronounced than before so zones feel clearly "active" on the map.
+  // Very subtle zone pulse — barely visible, just enough to signal "live data".
+  // Calm context, not a warning animation.
   _startZonePulse(zones) {
     let tick = 0
     const pulse = () => {
       tick++
-      const alpha = 0.07 + 0.15 * ((Math.sin(tick * 0.035) + 1) / 2) // 0.07–0.22, period ≈ 3s
+      const alpha = 0.04 + 0.05 * ((Math.sin(tick * 0.025) + 1) / 2) // 0.04–0.09, ~4s cycle
       zones.forEach(zone => {
         if (this.map && this.map.getLayer(`zone-fill-${zone.id}`)) {
           this.map.setPaintProperty(`zone-fill-${zone.id}`, "fill-opacity", alpha)
@@ -276,9 +276,9 @@ const MapHook = {
           id: `route-glow-${route.id}`, type: "line", source: sid,
           paint: {
             "line-color": route.color,
-            "line-opacity": isSelected ? 0.30 : 0,
-            "line-width": 12,
-            "line-blur": 10
+            "line-opacity": isSelected ? 0.12 : 0,
+            "line-width": 6,
+            "line-blur": 5
           },
           layout: { "line-cap": "round", "line-join": "round" }
         })
@@ -290,8 +290,8 @@ const MapHook = {
           id: `route-line-${route.id}`, type: "line", source: sid,
           paint: {
             "line-color": route.color,
-            "line-opacity": isSelected ? 1.0 : 0.25,
-            "line-width": isSelected ? 3.5 : 1.5,
+            "line-opacity": isSelected ? 0.90 : 0.22,
+            "line-width": isSelected ? 2.5 : 1.5,
             "line-dasharray": isSelected ? [1] : [5, 4]
           },
           layout: { "line-cap": "round", "line-join": "round" }

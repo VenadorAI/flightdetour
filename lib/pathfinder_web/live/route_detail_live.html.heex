@@ -3,18 +3,18 @@
   ───────────────
   Mobile (<md):
     1. Nav
-    2. Insight banner — one-line airspace status, above the map.
-       Gives users the key message before they scroll.
-    3. Map panel — 75svh, always in DOM so MapHook stays mounted.
-       No tab toggle: map IS the page. Details scroll naturally below.
-    4. All content below, in document flow.
-    5. Sticky Skyscanner CTA with contextual copy.
+    2. Insight banner — thin strip, airspace status at a glance.
+    3. Decision strip — route name, score, status label.
+    4. Quick facts — airspace / alt routes / hub.
+    5. Recommendation — best for / weakness / watch.
+    6. Map — full-width breakout (~40svh), after the decision content.
+    7. Remaining facts, analysis, trust block.
+    8. Sticky CTA at viewport bottom.
 
   Desktop (md+):
     1. Nav
-    2. Decision strip → quick facts → recommendation
-    3. "See where this route flies" map toggle
-    4. Inline CTA + analysis + rest of content
+    2. Decision strip → quick facts → recommendation → map (320px)
+    3. Inline CTA + analysis + rest of content
 --%>
 <div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark" id="route-detail-page" phx-hook="ScrollReset">
 
@@ -42,68 +42,16 @@
     <%!-- ── INSIGHT BANNER (mobile only) ──────────────────────────────────── --%>
     <%!-- Thin, high-contrast strip above the map. Answers "should I worry?"   --%>
     <%!-- in under 2 seconds before the user scrolls or reads anything else.   --%>
-    <% {insight_icon, insight_text, insight_cls} =
+    <% {insight_text, insight_color} =
       case @route.score.airspace_score do
-        0 -> {"✓", "Avoids all advisory zones on this corridor",             "bg-emerald-950/70 border-emerald-500/25 text-emerald-400"}
-        1 -> {"△", "Passes near restricted airspace — not directly through it", "bg-amber-950/60 border-amber-500/25 text-amber-400/90"}
-        2 -> {"⚠", "Crosses an active airspace advisory zone",               "bg-orange-950/60 border-orange-500/25 text-orange-400/90"}
-        _ -> {"✕", "Transits an active conflict zone",                        "bg-red-950/60 border-red-500/25 text-red-400/90"}
+        0 -> {"Avoids active advisory zones on this corridor",               "text-emerald-400/70"}
+        1 -> {"Passes near restricted airspace — not directly through it",   "text-amber-400/65"}
+        2 -> {"Crosses an active airspace advisory zone",                    "text-orange-400/70"}
+        _ -> {"Transits an active conflict zone",                            "text-red-400/65"}
       end %>
-    <div class={"shrink-0 flex items-center gap-2.5 px-4 py-2 border-b text-xs font-medium #{insight_cls}"}>
-      <span class="shrink-0 font-bold"><%= insight_icon %></span>
-      <span><%= insight_text %></span>
+    <div class={"shrink-0 px-4 py-2.5 border-b border-base-300 text-xs #{insight_color}"}>
+      <%= insight_text %>
     </div>
-
-    <%!-- ── MOBILE MAP PANEL ────────────────────────────────────────────────── --%>
-    <%!-- Always in DOM (no conditional) so the MapHook is mounted on first     --%>
-    <%!-- render and receives the push_event immediately on WS connect.          --%>
-    <%!-- md:hidden → on desktop, offsetWidth=0 → hook visibility-check exits.  --%>
-    <%= if @route.path_geojson do %>
-      <div class="md:hidden relative w-full shrink-0" style="height: 52svh; min-height: 220px;">
-
-        <%!-- Skeleton overlay — fades out once MapLibre fires its load event --%>
-        <div
-          id="mobile-map-skeleton"
-          class="absolute inset-0 bg-base-300/60 flex flex-col items-center justify-center gap-2.5 z-10 pointer-events-none transition-opacity duration-500"
-          aria-hidden="true"
-        >
-          <div class="w-8 h-8 rounded-full border-2 border-base-content/15 border-t-base-content/50 animate-spin"></div>
-          <p class="text-[11px] text-base-content/35 tracking-wide">Loading route map…</p>
-        </div>
-
-        <%!-- Map canvas — phx-update="ignore" keeps LiveView from diffing the DOM --%>
-        <div
-          id="mobile-route-map"
-          phx-hook="MapHook"
-          phx-update="ignore"
-          data-skeleton-id="mobile-map-skeleton"
-          class="w-full h-full"
-        ></div>
-
-        <%!-- Score badge — bottom-left of map, not blocking the route line --%>
-        <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-semibold pointer-events-none bg-base-100/85 backdrop-blur-sm
-          #{Pathfinder.Routes.RouteScore.label_bg(@route.score.label)}">
-          <div class={"w-2 h-2 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(@route.score.label)}"}></div>
-          <span class={"text-xs #{Pathfinder.Routes.RouteScore.label_color(@route.score.label)}"}>
-            <%= Pathfinder.Routes.RouteScore.label_text(@route.score.label) %>
-          </span>
-          <span class="text-sm font-bold text-base-content/80 tabular-nums"><%= @route.score.composite_score %></span>
-        </div>
-
-        <%!-- Route pair label — bottom-right of map --%>
-        <div class="absolute bottom-3 right-3 z-20 pointer-events-none">
-          <p class="text-[10px] font-semibold text-base-content/55 bg-base-100/80 backdrop-blur-sm px-2 py-0.5 rounded-full border border-base-content/10 tracking-wide">
-            <%= @iata_o %> → <%= @iata_d %>
-          </p>
-        </div>
-
-      </div>
-
-      <%!-- Scroll cue — tells mobile users there is content below the map --%>
-      <div class="md:hidden shrink-0 flex items-center justify-center gap-2 py-2 border-b border-base-300/50 bg-base-100">
-        <span class="text-[10px] text-base-content/30 tracking-wide">↓ route details</span>
-      </div>
-    <% end %>
 
     <%!-- ── MAIN CONTENT ──────────────────────────────────────────────────── --%>
     <%!-- All content is always visible — no tab switching. On mobile, this      --%>
@@ -115,32 +63,27 @@
         <% {action_label, action_color, strip_bg} =
           case @detail_freshness do
             :review_required ->
-              {"Advisory changed — verify before booking", "text-orange-400/90", "bg-orange-400/5 border-orange-400/20"}
+              {"Advisory data changed — verify before booking", "text-orange-400/80", "bg-orange-400/5 border-orange-400/20"}
             :stale ->
-              {"Score may be out of date — check airline advisories", "text-orange-400/75", "bg-orange-400/5 border-orange-400/15"}
+              {"Score may be out of date — check airline advisories", "text-orange-400/65", "bg-orange-400/5 border-orange-400/15"}
             _ ->
               case @route.score.label do
-                :flowing -> {"Book with confidence", "text-emerald-400", "bg-emerald-400/5 border-emerald-400/20"}
-                :watchful ->
-                  if @route.score.pressure_score - @route.score.structural_score >= 10 do
-                    {"Clear of advisory zones — fewer backup paths than top alternatives", "text-amber-400", "bg-amber-400/5 border-amber-400/20"}
-                  else
-                    {"Monitor before booking", "text-amber-400", "bg-amber-400/5 border-amber-400/20"}
-                  end
-                :constrained -> {"Book carefully — fewer options", "text-orange-400/90", "bg-orange-400/5 border-orange-400/20"}
-                :strained    -> {"Consider alternatives",          "text-red-400/80",    "bg-red-400/5 border-red-400/20"}
+                :flowing     -> {"No advisory zone exposure on this route",      "text-emerald-400/70", "border-base-300/60"}
+                :watchful    -> {"Monitor conditions before you book",           "text-amber-400/65",   "border-base-300/60"}
+                :constrained -> {"Fewer routing options on this corridor",       "text-orange-400/65",  "border-base-300/60"}
+                :strained    -> {"Consider alternative routes for this corridor","text-red-400/60",     "border-base-300/60"}
               end
           end %>
 
-        <div class={"mb-4 rounded-2xl border px-4 py-4 #{strip_bg}"}>
+        <div class={"mb-4 rounded-xl border px-4 py-4 #{strip_bg}"}>
           <div class="flex items-center justify-between gap-3 mb-2.5">
-            <span class={"text-base font-bold leading-tight #{action_color}"}><%= action_label %></span>
-            <div class={"shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-semibold #{Pathfinder.Routes.RouteScore.label_bg(@route.score.label)}"}>
+            <span class={"text-xs font-medium #{action_color}"}><%= action_label %></span>
+            <div class="shrink-0 flex items-center gap-1.5">
               <div class={"w-2 h-2 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(@route.score.label)}"}></div>
-              <span class={"text-sm #{Pathfinder.Routes.RouteScore.label_color(@route.score.label)}"}>
+              <span class={"text-xs font-medium #{Pathfinder.Routes.RouteScore.label_color(@route.score.label)}"}>
                 <%= Pathfinder.Routes.RouteScore.label_text(@route.score.label) %>
               </span>
-              <span class="text-base font-bold text-base-content/80 tabular-nums"><%= @route.score.composite_score %></span>
+              <span class="text-sm font-semibold text-base-content/70 tabular-nums"><%= @route.score.composite_score %></span>
             </div>
           </div>
           <h1 class="text-lg font-bold text-base-content tracking-tight leading-snug mb-0.5">
@@ -164,23 +107,23 @@
 
         <%!-- ── QUICK FACTS ─────────────────────────────────────────────────── --%>
         <div class="mb-4 grid grid-cols-3 gap-2">
-          <% {qs_bg, qs_border, qs_text, qs_label} =
+          <% {qs_text, qs_label} =
             case @route.score.airspace_score do
-              0 -> {"bg-emerald-400/8", "border-emerald-400/15", "text-emerald-400/80", "Clean"}
-              1 -> {"bg-base-200", "border-base-300", "text-base-content/50", "Near zone"}
-              2 -> {"bg-amber-400/8", "border-amber-400/15", "text-amber-400/80", "Advisory"}
-              _ -> {"bg-red-400/8", "border-red-400/15", "text-red-400/70", "Conflict"}
+              0 -> {"text-emerald-400/75", "Clean"}
+              1 -> {"text-base-content/50", "Near zone"}
+              2 -> {"text-amber-400/75",   "Advisory"}
+              _ -> {"text-red-400/65",     "Conflict"}
             end %>
-          <div class={"rounded-xl p-3 border text-center #{qs_bg} #{qs_border}"}>
+          <div class="rounded-xl p-3 border border-base-300/60 text-center">
             <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Airspace</p>
             <p class={"text-xs font-semibold #{qs_text}"}><%= qs_label %></p>
           </div>
           <% {fb_label, fb_color} = Pathfinder.Scoring.fallback_strength(@route.score.corridor_score) %>
-          <div class="bg-base-200 rounded-xl p-3 border border-base-300 text-center">
+          <div class="rounded-xl p-3 border border-base-300/60 text-center">
             <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">Alt routes</p>
             <p class={"text-xs font-semibold #{fb_color}"}><%= fb_label %></p>
           </div>
-          <div class="bg-base-200 rounded-xl p-3 border border-base-300 text-center">
+          <div class="rounded-xl p-3 border border-base-300/60 text-center">
             <p class="text-[10px] text-base-content/30 uppercase tracking-widest mb-1">
               <%= if @route.via_hub_city, do: "Via", else: "Route" %>
             </p>
@@ -219,8 +162,60 @@
           <% end %>
         </div>
 
+        <%!-- ── MOBILE MAP (full-width breakout) ──────────────────────────────── --%>
+        <%!-- Sits after the decision content so users read summary first.         --%>
+        <%!-- -mx-4 breaks out of the px-4 container to reach the screen edge.    --%>
+        <%!-- md:hidden → desktop map below handles desktop; visibility guard      --%>
+        <%!-- in MapHook ensures only the visible instance boots.                  --%>
+        <%= if @route.path_geojson do %>
+          <div class="md:hidden -mx-4 relative w-full mb-1" style="height: 40svh; min-height: 200px;">
+
+            <%!-- Skeleton overlay --%>
+            <div
+              id="mobile-map-skeleton"
+              class="absolute inset-0 bg-base-300/60 flex flex-col items-center justify-center gap-2.5 z-10 pointer-events-none transition-opacity duration-500"
+              aria-hidden="true"
+            >
+              <div class="w-8 h-8 rounded-full border-2 border-base-content/15 border-t-base-content/50 animate-spin"></div>
+              <p class="text-[11px] text-base-content/35 tracking-wide">Loading route map…</p>
+            </div>
+
+            <%!-- Map canvas --%>
+            <div
+              id="mobile-route-map"
+              phx-hook="MapHook"
+              phx-update="ignore"
+              data-skeleton-id="mobile-map-skeleton"
+              class="w-full h-full"
+            ></div>
+
+            <%!-- Score badge — bottom-left --%>
+            <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-semibold pointer-events-none bg-base-100/85 backdrop-blur-sm
+              #{Pathfinder.Routes.RouteScore.label_bg(@route.score.label)}">
+              <div class={"w-2 h-2 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(@route.score.label)}"}></div>
+              <span class={"text-xs #{Pathfinder.Routes.RouteScore.label_color(@route.score.label)}"}>
+                <%= Pathfinder.Routes.RouteScore.label_text(@route.score.label) %>
+              </span>
+              <span class="text-sm font-bold text-base-content/80 tabular-nums"><%= @route.score.composite_score %></span>
+            </div>
+
+            <%!-- Route pair label — bottom-right --%>
+            <div class="absolute bottom-3 right-3 z-20 pointer-events-none">
+              <p class="text-[10px] font-semibold text-base-content/55 bg-base-100/80 backdrop-blur-sm px-2 py-0.5 rounded-full border border-base-content/10 tracking-wide">
+                <%= @iata_o %> → <%= @iata_d %>
+              </p>
+            </div>
+
+          </div>
+
+          <%!-- Scroll cue below the map --%>
+          <div class="md:hidden flex items-center justify-center gap-2 py-2 mb-3 border-b border-base-300/50">
+            <span class="text-[10px] text-base-content/30 tracking-wide">↓ route details</span>
+          </div>
+        <% end %>
+
         <%!-- ── DESKTOP MAP ────────────────────────────────────────────────────── --%>
-        <%!-- Always rendered. Mobile map (md:hidden above) handles mobile;        --%>
+        <%!-- Always rendered. Mobile map above handles mobile;                    --%>
         <%!-- this panel (hidden md:block) handles desktop. The MapHook visibility  --%>
         <%!-- guard (offsetWidth===0) ensures only the visible instance boots.      --%>
         <%= if @route.path_geojson do %>
