@@ -311,25 +311,25 @@ defmodule PathfinderWeb.ResultsLive do
         nil
 
       stale_best && flowing == total && total == 1 ->
-        "#{best_name} was last rated Flowing — score may not reflect current advisories."
+        "#{best_name} looked clean when last assessed — check current advisories before booking."
 
       stale_best && flowing > 0 ->
-        "#{total} routes assessed for this corridor. #{best_name} scores highest — verify advisories before booking."
+        "#{best_name} is the better option here — but check current advisories before booking."
 
       flowing == total && total == 1 ->
-        "#{best_name} is currently rated Flowing — no advisory zone exposure on this corridor."
+        "#{best_name} avoids all active advisory zones on this corridor."
 
       flowing == total ->
-        "All #{total} assessed routes are currently rated Flowing."
+        "All #{total} routes on this corridor look clean right now."
 
       all_exposed ->
-        "All #{total} assessed routes cross the advisory zone. Compare corridors to find the lowest exposure path."
+        "Every route on this corridor crosses an advisory zone — pick the one with the least exposure."
 
       flowing > 0 ->
-        "#{flowing} of #{total} routes rated Flowing. #{best_name} is the strongest current option."
+        "#{best_name} is the cleaner option. Not all routes here avoid the advisory zone."
 
       true ->
-        "#{total} routes assessed for this corridor. #{best_name} scores highest."
+        "#{best_name} is the better choice right now."
     end
   end
 end

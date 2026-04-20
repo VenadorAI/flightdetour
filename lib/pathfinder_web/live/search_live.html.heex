@@ -17,11 +17,11 @@
       <%!-- Heading --%>
       <div class="mb-5 text-center">
         <h1 class="text-2xl sm:text-3xl font-bold text-base-content mb-2 tracking-tight">
-          Not every flight takes the same path.
+          Which flight path is actually cleaner right now?
         </h1>
         <p class="text-base-content/45 text-sm leading-relaxed">
-          Some flights to Asia and the Middle East are now longer, rerouted, or more exposed than others.
-          See which path still looks cleaner — before you book.
+          Long-haul routes to Asia and the Middle East aren't equal. Some cross advisory zones.
+          Some are hours longer. Find which corridor still looks cleaner before you book.
         </p>
       </div>
 
@@ -112,7 +112,7 @@
           <div class="flex items-center gap-1.5">
             <div class="w-1.5 h-1.5 rounded-full bg-base-content/20 shrink-0"></div>
             <span class="text-xs text-base-content/25">
-              Sources checked <%= Pathfinder.Advisory.Freshness.format_age(@latest_source_check) %>
+              EASA data, checked <%= Pathfinder.Advisory.Freshness.format_age(@latest_source_check) %> ago
             </span>
           </div>
         <% end %>
@@ -121,7 +121,7 @@
       <%!-- Featured routes — pairs where the corridor choice creates meaningful advisory differences --%>
       <%= if length(@featured_pairs) > 0 do %>
         <div class="mt-6">
-          <p class="text-[10px] text-base-content/30 uppercase tracking-widest text-center mb-3">Routes people are comparing right now</p>
+          <p class="text-[10px] text-base-content/30 uppercase tracking-widest text-center mb-3">Corridors with the biggest score gap between options</p>
           <div class="flex flex-wrap gap-1.5 justify-center">
             <%= for pair <- @featured_pairs do %>
               <% slug = Pathfinder.CitySlug.pair_slug(pair.origin, pair.destination) %>

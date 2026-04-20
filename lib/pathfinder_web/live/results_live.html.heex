@@ -185,18 +185,16 @@
       <div class="order-first md:order-last flex-1 min-h-0 overflow-y-auto md:border-l border-base-300" id="results-scroll-container">
         <div class="px-4 py-4 max-w-xl mx-auto md:max-w-none md:px-5">
 
-          <%!-- SEO intro — search-intent framing before the verdict --%>
-          <%= if @origin_city && @destination_city do %>
-            <p class="text-xs text-base-content/35 leading-relaxed mb-2">
-              Not every flight from <%= @origin_city.name %> to <%= @destination_city.name %> takes the same path right now.
-            </p>
-          <% end %>
-
-          <%!-- Pair verdict — crawlable synthesized summary, unique per corridor state --%>
+          <%!-- Pair verdict — the primary message. Displayed as the visual headline.  --%>
+          <%!-- sr-only H1 above handles SEO; this element is for human readers.     --%>
           <% verdict = PathfinderWeb.ResultsLive.pair_verdict(@routes, @best_route) %>
           <%= if verdict do %>
-            <p class="text-sm text-base-content/70 leading-relaxed mb-3">
+            <p class="text-lg font-semibold text-base-content/90 leading-snug mb-1">
               <%= verdict %>
+            </p>
+            <p class="text-[10px] text-base-content/30 mb-4">
+              Scored from EASA and national authority data ·
+              <.link navigate={~p"/how-it-works"} class="hover:text-base-content/50 transition-colors underline underline-offset-2 decoration-base-content/20">How scores work</.link>
             </p>
           <% end %>
 
@@ -607,33 +605,14 @@
                         </div>
                       <% end %>
 
-                      <%!-- Actions: understand first (primary), search second (secondary) --%>
-                      <% exp_iata_o = hd(route.origin_city.iata_codes || [""]) %>
-                      <% exp_iata_d = hd(route.destination_city.iata_codes || [""]) %>
-                      <% exp_links = Pathfinder.Outbound.search_links(exp_iata_o, exp_iata_d) %>
+                      <%!-- Actions: understand the route first. Search is on the detail page. --%>
                       <div class="border-t border-base-300/60 pt-3 space-y-2">
-                        <%!-- Primary: read full analysis — tinted to advisory state --%>
                         <.link
                           navigate={~p"/routes/#{route.id}"}
                           class={"flex items-center justify-center gap-1.5 w-full rounded-lg px-3 py-2.5 text-xs font-semibold transition-all #{advisory_btn_cls}"}
                         >
                           Full analysis →
                         </.link>
-                        <%!-- Flight search: secondary, text only — full booking UI is on the detail page --%>
-                        <% sky = Enum.find(exp_links, fn {k, _, _} -> k == :skyscanner end) %>
-                        <%= if sky do %>
-                          <% {sky_key, sky_label, _} = sky %>
-                          <div class="text-center">
-                            <a
-                              href={"/go?provider=#{sky_key}&o=#{exp_iata_o}&d=#{exp_iata_d}&pair=#{@pair_slug}&route_id=#{route.id}"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="text-[10px] text-base-content/30 hover:text-base-content/55 transition-colors"
-                            >
-                              Search on <%= sky_label %> ↗
-                            </a>
-                          </div>
-                        <% end %>
                         <% card_freshness = Pathfinder.Advisory.Freshness.for_score(route.score) %>
                         <% card_ctx = Pathfinder.Advisory.Freshness.source_context(card_freshness, @latest_source_check) %>
                         <%= if card_ctx do %>

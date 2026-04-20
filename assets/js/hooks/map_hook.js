@@ -290,9 +290,9 @@ const MapHook = {
           id: `route-line-${route.id}`, type: "line", source: sid,
           paint: {
             "line-color": route.color,
-            "line-opacity": isSelected ? 0.90 : 0.22,
+            "line-opacity": isSelected ? 0.90 : 0.42,
             "line-width": isSelected ? 2.5 : 1.5,
-            "line-dasharray": isSelected ? [1] : [5, 4]
+            "line-dasharray": isSelected ? [1] : [5, 3]
           },
           layout: { "line-cap": "round", "line-join": "round" }
         })
@@ -419,7 +419,7 @@ const MapHook = {
       const lineId = `route-line-${route.id}`
       const glowId = `route-glow-${route.id}`
       if (this.map.getLayer(lineId)) {
-        this.map.setPaintProperty(lineId, "line-opacity", isSelected ? 1.0 : 0.30)
+        this.map.setPaintProperty(lineId, "line-opacity", isSelected ? 1.0 : 0.38)
         this.map.setPaintProperty(lineId, "line-width", isSelected ? 3 : 1.5)
         this.map.setPaintProperty(lineId, "line-dasharray", isSelected ? [1] : [5, 4])
       }
