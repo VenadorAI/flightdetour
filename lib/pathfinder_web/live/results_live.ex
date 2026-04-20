@@ -106,6 +106,23 @@ defmodule PathfinderWeb.ResultsLive do
     {:noreply, assign(socket, :show_compare, !socket.assigns.show_compare)}
   end
 
+  # MapHook fires this when MapLibre's load event fires before the WS push_event
+  # arrives (fast tile cache, slow socket, reconnect). Re-pushes render data.
+  def handle_event("map-ready", _params, socket) do
+    routes = socket.assigns.routes
+    socket =
+      if routes != [] do
+        push_event(socket, "render-routes", %{
+          routes: Routes.routes_as_map_features(routes),
+          zones: socket.assigns.zones,
+          selected_id: socket.assigns.selected_route_id
+        })
+      else
+        socket
+      end
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_info({:map_route_selected, id}, socket) do
     {:noreply, assign(socket, :selected_route_id, id)}

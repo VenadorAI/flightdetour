@@ -16,7 +16,7 @@
     3. "See where this route flies" map toggle
     4. Inline CTA + analysis + rest of content
 --%>
-<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark">
+<div class="min-h-screen bg-base-100 flex flex-col" data-theme="dark" id="route-detail-page" phx-hook="ScrollReset">
 
   <%!-- ── NAV ─────────────────────────────────────────────────────────── --%>
   <nav class="px-5 py-3 flex items-center gap-3 border-b border-base-300 shrink-0 min-w-0">
@@ -59,7 +59,7 @@
     <%!-- render and receives the push_event immediately on WS connect.          --%>
     <%!-- md:hidden → on desktop, offsetWidth=0 → hook visibility-check exits.  --%>
     <%= if @route.path_geojson do %>
-      <div class="md:hidden relative w-full shrink-0" style="height: 80svh; min-height: 280px;">
+      <div class="md:hidden relative w-full shrink-0" style="height: 52svh; min-height: 220px;">
 
         <%!-- Skeleton overlay — fades out once MapLibre fires its load event --%>
         <div
@@ -97,6 +97,11 @@
           </p>
         </div>
 
+      </div>
+
+      <%!-- Scroll cue — tells mobile users there is content below the map --%>
+      <div class="md:hidden shrink-0 flex items-center justify-center gap-2 py-2 border-b border-base-300/50 bg-base-100">
+        <span class="text-[10px] text-base-content/30 tracking-wide">↓ route details</span>
       </div>
     <% end %>
 
@@ -450,7 +455,7 @@
                 <%= if sib.score do %>
                   <.link
                     navigate={~p"/routes/#{sib.id}"}
-                    class="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-base-200 border border-base-300 hover:border-base-content/20 transition-all group"
                   >
                     <div class={"shrink-0 w-1.5 h-1.5 rounded-full #{Pathfinder.Routes.RouteScore.label_dot(sib.score.label)}"}></div>
                     <span class="text-xs text-base-content/60 group-hover:text-base-content/80 flex-1 truncate"><%= sib.route_name %></span>
@@ -513,16 +518,16 @@
         :constrained -> "bg-orange-500 border-orange-400 text-white hover:bg-orange-400"
         _            -> "bg-base-content border-base-content/80 text-base-100 hover:bg-base-content/90"
       end %>
-      <div class="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pt-3 pb-5 bg-base-100/96 backdrop-blur-sm border-t border-base-300">
+      <div class="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pt-2 pb-4 bg-base-100/96 backdrop-blur-sm border-t border-base-300">
         <a
           href={"/go?provider=#{sky_key}&o=#{@iata_o}&d=#{@iata_d}&pair=#{@pair_slug}&route_id=#{@route.id}"}
           target="_blank"
           rel="noopener noreferrer"
-          class={"flex items-center justify-center gap-2 w-full rounded-xl border px-4 py-4 text-sm font-bold active:scale-[0.98] transition-all #{cta_btn_cls}"}
+          class={"flex items-center justify-center gap-2 w-full rounded-xl border px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all #{cta_btn_cls}"}
         >
           <%= @cta_label %> ↗
         </a>
-        <p class="text-center text-[10px] text-base-content/25 mt-1.5">via Skyscanner</p>
+        <p class="text-center text-[10px] text-base-content/25 mt-1">via Skyscanner</p>
       </div>
     <% end %>
 

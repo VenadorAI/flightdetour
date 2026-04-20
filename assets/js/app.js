@@ -27,6 +27,12 @@ import topbar from "../vendor/topbar"
 import MapHook from "./hooks/map_hook"
 import ZoneMapHook from "./hooks/zone_map_hook"
 
+// Scrolls window to the top on every LiveView mount — ensures navigating
+// to a route detail page from search results always lands at the page top.
+const ScrollReset = {
+  mounted() { window.scrollTo(0, 0) }
+}
+
 const CopyRouteLink = {
   mounted() {
     this.el.addEventListener("click", async () => {
@@ -56,7 +62,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, MapHook, ZoneMapHook, CopyRouteLink},
+  hooks: {...colocatedHooks, MapHook, ZoneMapHook, CopyRouteLink, ScrollReset},
 })
 
 // Show progress bar on live navigation and form submits

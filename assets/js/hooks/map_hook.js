@@ -61,14 +61,15 @@ const MapHook = {
       return
     }
 
-    this.routeData   = []
-    this.selectedId  = null
-    this.mapReady    = false
+    this.routeData     = []
+    this.selectedId    = null
+    this.mapReady      = false
     this.pendingRender = null
     this.lastRouteIds  = null
-    this._markers    = []
-    this._animFrame  = null
-    this._pulseFrame = null
+    this._hasDrawn     = false
+    this._markers      = []
+    this._animFrame    = null
+    this._pulseFrame   = null
 
     console.time(`map-init:${this.el.id}`)
 
@@ -111,8 +112,14 @@ const MapHook = {
         console.timeEnd(`map-init:${this.el.id}`)
         this._hideSkeleton()
         if (this.pendingRender) {
+          // WS push arrived before map was ready — render from queued data.
           this._renderRoutes(this.pendingRender)
+          this._hasDrawn = true
           this.pendingRender = null
+        } else {
+          // Map loaded before WS push (fast cache, slow socket, reconnect, etc.).
+          // Ask the server to re-send route data now that we are ready to draw.
+          this.pushEvent("map-ready", {})
         }
       })
 
@@ -130,8 +137,11 @@ const MapHook = {
 
     this.handleEvent("render-routes", (data) => {
       // ── Re-render guard ───────────────────────────────────────────────
+      // Skip only if we have already *drawn* these route IDs. If the map
+      // hasn't drawn yet (lastRouteIds null OR mapReady not yet set when
+      // the first push arrived and set lastRouteIds) allow through.
       const incomingIds = (data.routes || []).map(r => r.id).sort().join(",")
-      if (incomingIds === this.lastRouteIds) return
+      if (incomingIds === this.lastRouteIds && this._hasDrawn) return
       this.lastRouteIds = incomingIds
 
       if (this.map) this.map.resize()
@@ -139,6 +149,7 @@ const MapHook = {
 
       if (this.mapReady) {
         this._renderRoutes(data)
+        this._hasDrawn = true
         console.timeEnd(`map-render:${this.el.id}`)
       } else {
         this.pendingRender = data

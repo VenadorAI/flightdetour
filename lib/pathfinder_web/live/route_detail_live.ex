@@ -127,6 +127,24 @@ defmodule PathfinderWeb.RouteDetailLive do
     {:noreply, assign(socket, :show_analysis, !socket.assigns.show_analysis)}
   end
 
+  # Called by MapHook when MapLibre's `load` event fires before the WS-connect
+  # push_event arrives (fast cache, slow socket, reconnect after disconnect, etc.).
+  # Re-pushes the render payload on demand so the map always gets its data.
+  def handle_event("map-ready", _params, socket) do
+    route = socket.assigns.route
+    socket =
+      if route.score && route.path_geojson do
+        push_event(socket, "render-routes", %{
+          routes: [route_payload(route, socket.assigns.iata_o, socket.assigns.iata_d)],
+          zones: socket.assigns.zones,
+          selected_id: route.id
+        })
+      else
+        socket
+      end
+    {:noreply, socket}
+  end
+
   # Build the route map payload — shared between initial push and toggle-map re-push.
   # Includes origin/dest IATA for markers and via hub for contextual CTA.
   defp route_payload(route, iata_o, iata_d) do
