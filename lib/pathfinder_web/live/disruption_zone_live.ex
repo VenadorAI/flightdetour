@@ -62,6 +62,28 @@ defmodule PathfinderWeb.DisruptionZoneLive do
     end
   end
 
+  # ZoneMapHook fires this when MapLibre's load event fires before the WS push_event
+  # arrives (fast tile cache, slow socket, reconnect). Re-pushes the zone boundary.
+  @impl true
+  def handle_event("zone-map-ready", _params, socket) do
+    zone = socket.assigns.zone
+    socket =
+      if zone.boundary_geojson do
+        push_event(socket, "render-zone", %{
+          zone: %{
+            id: zone.id,
+            name: zone.name,
+            color: DisruptionZone.severity_color(zone.severity),
+            opacity: DisruptionZone.severity_opacity(zone.severity),
+            geojson: zone.boundary_geojson
+          }
+        })
+      else
+        socket
+      end
+    {:noreply, socket}
+  end
+
   defp zone_status_text(:active), do: "active advisory"
   defp zone_status_text(:monitoring), do: "advisory under monitoring"
   defp zone_status_text(:resolved), do: "resolved advisory (historical)"

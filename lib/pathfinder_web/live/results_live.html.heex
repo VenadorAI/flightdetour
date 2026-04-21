@@ -197,7 +197,7 @@
               <%= verdict %>
             </p>
             <p class="text-[10px] text-base-content/30 mb-4">
-              Scored from EASA and national authority data ·
+              Scored from EASA and national authority data<%= if @latest_source_check, do: " · checked #{Pathfinder.Advisory.Freshness.format_age(@latest_source_check)}", else: "" %> ·
               <.link navigate={~p"/how-it-works"} class="hover:text-base-content/50 transition-colors underline underline-offset-2 decoration-base-content/20">How scores work</.link>
             </p>
           <% end %>
